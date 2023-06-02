@@ -1,0 +1,7 @@
+"0","promedios <- colMeans(colest)"
+"0",""
+"0","c1 <- ggplot(colest, aes(edad, colest)) + "
+"0","  geom_point() +geom_vline(xintercept=promedios[2]) +geom_hline(yintercept=promedios[3]) + theme_minimal()"
+"0","c2 <- ggplot(colest, aes(peso, colest))+ "
+"0","grid.arrange(c1,c2, ncol = 1, nrow = 2)"
+"0",""
