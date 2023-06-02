@@ -1,0 +1,142 @@
+---
+title: "TP1 Regresión Lineal Simple"
+author: "Marcos Buccellato"
+date: '2023-06-01'
+output:
+  html_document:
+    toc: yes
+    toc_depth: 5
+    number_sections: no
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
+  word_document:
+    toc: yes
+    toc_depth: '5'
+editor_options:
+  markdown:
+    wrap: 72
+always_allow_html: yes
+---
+
+```{r setup, warning=FALSE, cache=FALSE, message=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(MVN)
+library(gridExtra)
+```
+
+
+
+# 1.1.Correlación 
+
+## Ejercicio1.1.
+
+En el archivo grasacerdos.xlsx se encuentran los datos del peso  vivo  (PV,en Kg) y al epesor de grasa dorsal(EGD,en mm) de 30 lechones elegidos al azar de una población de porcinos Duroc Jersey del Oeste de la provincia de Buenos Aires. Se pide 
+
+
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+
+grasa <- read_excel('grasacerdos.xlsx')
+grasa$PV <- as.numeric(gsub(",", ".", grasa$PV))
+grasa$EGD <- as.numeric(gsub(",", ".", grasa$EGD))
+```
+
+
+### (a)Dibujar el diagrama de dispersión e interpretarlo.
+
+```{r}
+ggplot(grasa, aes(PV, EGD)) + 
+  geom_point() + theme_minimal()
+```
+Como cambia el EGD en función del crecimiento del PV.
+
+### (b)Calcular el coeficiente de correlación muestral y explíquelo. 
+
+```{r}
+biNormTest <- mvn(data = grasa[2:3], mvnTest = "hz")
+corCoeff <- cor(grasa$PV,grasa$EGD, method = "pearson")
+print(biNormTest$multivariateNormality)
+```
+Como el test de binormalidad de las variables dio positivo, puedo usar el coeficiente de perason como indicador de la correlación entre las variables. 
+
+### (c)¿Hay suficiente evidencia para admitir asociación entre el peso y el espesor de grasa? (α=0,05). Verifique los supuestos para decidir el indicador que va a utilizar.
+
+```{r}
+corTest <- cor.test(grasa$PV,grasa$EGD, method = "pearson") 
+
+```
+
+El resultado de un test de correlación (usando Pearson según se vio en (b)) dio negativo con un p valor de `r corTest$p.value` que es mayor al $\alpha$ = 0,05
+
+## Ejercicio1.2.
+Los datos del cuarteto de Anscombe se encuentran en el archivo anscombe.xlsx
+
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+anscombre <- read_excel('anscombe.xlsx')
+```
+
+Se pide explorar los datos de la siguiente manera: 
+
+### (a) Graficar los cuatro pares de datos en un diagrama de dispersión cada uno.
+
+```{r}
+c1 <- ggplot(anscombe, aes(x1, y1)) + 
+  geom_point() + theme_minimal()
+c2 <- ggplot(anscombe, aes(x2, y2))+ 
+  geom_point() + theme_minimal()
+c3 <- ggplot(anscombe, aes(x3, y3))+ 
+  geom_point() + theme_minimal()
+c4 <- ggplot(anscombe, aes(x4, y4))+ 
+  geom_point() + theme_minimal()
+grid.arrange(c1,c2,c3,c4, ncol = 2, nrow = 2)
+```
+
+### (b) Hallar los valores medios de las variables para cada par de datos.
+
+```{r}
+colMeans(anscombe)
+```
+
+### (c) Hallar los valores de la dispersión para cada conjunto de datos. 
+```{r}
+sapply(anscombe, sd)
+```
+### (d) Hallar el coeficiente muestral de correlación lineal en cada caso.
+
+```{r}
+mvn(data = anscombe[c(1,5)], mvnTest = "hz")$multivariateNormality$MVN
+mvn(data = anscombe[c(2,6)], mvnTest = "hz")$multivariateNormality$MVN
+mvn(data = anscombe[c(3,7)], mvnTest = "hz")$multivariateNormality$MVN
+mvn(data = anscombe[c(4,8)], mvnTest = "hz")$multivariateNormality$MVN
+cor.test(anscombe$x1,anscombe$y1,method="pearson")$p.value
+cor.test(anscombe$x2,anscombe$y2,method="spearman")$p.value
+cor.test(anscombe$x3,anscombe$y3,method="spearman")$p.value
+cor.test(anscombe$x4,anscombe$y4,method="spearman")$p.value
+
+```
+
+### (e) Observar, comentar y concluir.
+
+Los primeros pares de variables son binormales por lo tanto puedo usar pearson. Hay correlación porque ep p-valor es bajo. EN los siguientes no podría usar pearson porque no son binormales, por tal motivo uso spearman. Hay correlación salvo en el caso del cuarto par de variables.
+
+
+# 1.2.Modelo Lineal Simple
+
+## Ejercicio1.3.
+El archivo peso_edad_colest.xlsx disponible en contiene registros correspondiente sa 25 individuos respecto de supeso, su edad y el nivel de colesterol total en sangre.
+
+
+Se pide:
+
+### (a) Realizar el diagrama de dispersión de colesterol en función de la edad y de colesterol en función de peso. Le parece adecuado ajustar un modelo lineal para alguno de estos dos pares de variables? 
+### (b) Estime los coeficientes del modelo lineal para el colesterol en función de la edad. 
+### (c) Estime intervalos de confianza del 95% para los coeficientes del modelo y compare estos resultados con el test de Wald para los coeficientes.Le parece que hay asociación entre estos test y el test del aregresión? 
+### (d) A partir de esta recta estime los valores de E(Y) para x=25 años y  x=48 años. Podría estimarse el valor de E(Y) para x=80 años?
+### (e) Testee la normalidad de los residuos y haga un gráfico para ver si son homocedásticos.
+
