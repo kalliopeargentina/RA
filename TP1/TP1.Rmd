@@ -131,12 +131,53 @@ Los primeros pares de variables son binormales por lo tanto puedo usar pearson. 
 ## Ejercicio1.3.
 El archivo peso_edad_colest.xlsx disponible en contiene registros correspondiente sa 25 individuos respecto de supeso, su edad y el nivel de colesterol total en sangre.
 
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+colest <- read_excel('peso_edad_colest.xlsx')
+```
 
 Se pide:
 
 ### (a) Realizar el diagrama de dispersión de colesterol en función de la edad y de colesterol en función de peso. Le parece adecuado ajustar un modelo lineal para alguno de estos dos pares de variables? 
+
+```{r}
+promedios <- colMeans(colest)
+
+c1 <- ggplot(colest, aes(edad, colest)) + 
+  geom_point() +geom_vline(xintercept=promedios[2]) +geom_hline(yintercept=promedios[3]) + theme_minimal()
+c2 <- ggplot(colest, aes(peso, colest))+ 
+  geom_point() +geom_vline(xintercept=promedios[1]) +geom_hline(yintercept=promedios[3]) + theme_minimal()
+grid.arrange(c1,c2, ncol = 1, nrow = 2)
+
+```
+
+En aparencia colest ~ peso parecería poder ajustarse linealmente.
+
 ### (b) Estime los coeficientes del modelo lineal para el colesterol en función de la edad. 
-### (c) Estime intervalos de confianza del 95% para los coeficientes del modelo y compare estos resultados con el test de Wald para los coeficientes.Le parece que hay asociación entre estos test y el test del aregresión? 
+
+```{r}
+
+model <- lm(colest ~ edad, data = colest)
+model$coefficients
+
+```
+
+
+### (c) Estime intervalos de confianza del 95% para los coeficientes del modelo y compare estos resultados con el test de Wald para los coeficientes.Le parece que hay asociación entre estos test y el test de la regresión? 
+
+cálculo de coeficientes de condianza:
+```{r}
+ci <- confint(model, level = 0.95)
+ci
+```
+test de Wald:
+
+```{r}
+summary(model)
+
+```
+
+
 ### (d) A partir de esta recta estime los valores de E(Y) para x=25 años y  x=48 años. Podría estimarse el valor de E(Y) para x=80 años?
+
 ### (e) Testee la normalidad de los residuos y haga un gráfico para ver si son homocedásticos.
 
