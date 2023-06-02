@@ -143,9 +143,15 @@ Se pide:
 promedios <- colMeans(colest)
 
 c1 <- ggplot(colest, aes(edad, colest)) + 
-  geom_point() +geom_vline(xintercept=promedios[2]) +geom_hline(yintercept=promedios[3]) + theme_minimal()
-c2 <- ggplot(colest, aes(peso, colest))+ 
-  geom_point() +geom_vline(xintercept=promedios[1]) +geom_hline(yintercept=promedios[3]) + theme_minimal()
+  geom_point() +
+  geom_vline(xintercept=promedios[2],linetype="dotted") + 
+  geom_hline(yintercept=promedios[3],linetype="dotted") + 
+  theme_minimal()
+c2 <- ggplot(colest, aes(peso, colest)) + 
+  geom_point() + 
+  geom_vline(xintercept=promedios[1],linetype="dotted") +
+  geom_hline(yintercept=promedios[3],linetype="dotted") + 
+  theme_minimal()
 grid.arrange(c1,c2, ncol = 1, nrow = 2)
 
 ```
