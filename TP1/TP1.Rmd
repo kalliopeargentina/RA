@@ -109,7 +109,7 @@ sapply(anscombe, sd)
 ```
 ### (d) Hallar el coeficiente muestral de correlación lineal en cada caso.
 
-```{r}
+```{r warning=FALSE}
 mvn(data = anscombe[c(1,5)], mvnTest = "hz")$multivariateNormality$MVN
 mvn(data = anscombe[c(2,6)], mvnTest = "hz")$multivariateNormality$MVN
 mvn(data = anscombe[c(3,7)], mvnTest = "hz")$multivariateNormality$MVN
@@ -174,7 +174,7 @@ model$coefficients
 
 ### (c) Estime intervalos de confianza del 95% para los coeficientes del modelo y compare estos resultados con el test de Wald para los coeficientes.Le parece que hay asociación entre estos test y el test de la regresión? 
 
-cálculo de coeficientes de condianza:
+cálculo de coeficientes de confianza:
 ```{r}
 ci <- confint(model, level = 0.95)
 ci
@@ -188,7 +188,7 @@ coef(model)
 wald.test(Sigma = vcov(model), b = coef(model), Terms = 1)
 
 ```
-
+<span style="color: red;">No se muy bien que concluir</span>
 
 ### (d) A partir de esta recta estime los valores de E(Y) para x=25 años y  x=48 años. Podría estimarse el valor de E(Y) para x=80 años?
 
@@ -200,6 +200,50 @@ predict(model, newdata = data.frame(edad = c(25,80)))
 ### (e) Testee la normalidad de los residuos y haga un gráfico para ver si son homocedásticos.
 
 ```{r}
+
+shapiro.test(model$residuals)
+```
+```{r warning=FALSE}
+colest2<-colest
+colest2$prediccion <- model$fitted.values 
+colest2$residuos <- model$residuals
+
+
+ggplot(data = colest2, aes(x = prediccion, y = residuos)) + 
+  geom_point(aes(color = residuos)) + 
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
+  geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
+  labs(title = "Distribución de los residuos", x = "predicción modelo", y = "residuo") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+
+ggplot(data = colest2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+  labs(title = "Histograma de los residuos") + theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+qqnorm(model$residuals) 
+qqline(model$residuals)
+
+
+```
+
+
+<span style="color: red;">No esta normalmente distribuido</Span>
+
+```{r,echo=TRUE, warning=FALSE}
+#install.packages("lmtest")
+library(lmtest) 
+bptest(model)
+```
+<span style="color: red;">Concluimos que se rechaza homocedasticidad</span>
+
+```{r}
+ggplot(data = colest2, aes(x = seq_along(residuos), y = residuos)) + 
+  geom_point(aes(color = residuos)) + 
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
+  geom_line(size = 0.3) + labs(title = "Distribución de los residuos", x = "index", y = "residuo")+ 
+  geom_hline(yintercept = 0) + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
 
 ```
 
