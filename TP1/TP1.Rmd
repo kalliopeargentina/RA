@@ -228,16 +228,36 @@ qqline(model$residuals)
 ```
 
 
-<span style="color: red;">Están normalmente distribuidos porque el test fasllo en rechazar la hipótesis nula de que no están normalmente distribuidos</Span>
+Están normalmente distribuidos porque el test falló en rechazar la hipótesis nula de que no están normalmente distribuidos y el valor es cercano a uno. En el qqplot se pueden ver los valores alineados a la diagonal, lo cual indica coincidencia cercana con los cuantiles teóricos.
 
 ```{r,echo=TRUE, warning=FALSE}
 #install.packages("lmtest")
 library(lmtest) 
 bptest(model)
 ```
-<span style="color: red;">Concluimos que se rechaza homocedasticidad</span>
+Concluimos que se rechaza heteroscedasticidad porque el p-valor para rechazar homocedasticidad no es menor a 0.05 siendo los residuos normales y la relación lineal.
+
+Habría que ver la independencia de las variables para ver si el resultado se mantiene, aplicamos el test de  Durbin-Watson:
+
+```{r,echo=TRUE, warning=FALSE, message=FALSE}
+library(car)
+dwt(model)
+```
+La hipótesis nula de este test es la no autocorrelación, en este caso no se puede descartar la misma. Esto implica que no se sostiene el supuesto de linealidad. Por tal motivo la conclusión del test anterior no se puede aplicar.
+
+Graficamos:
 
 ```{r}
+
+ggplot(colest2, aes(x = prediccion, y = residuos)) +
+  geom_point(shape = 20) +
+  labs(x = "Predicción", y = "Residuos",
+       title = "Residuos vs. Predicción")
+```
+
+No parece haber un patrón entre los residuos, por lo cual no se puede ver heterocedasticidad. En clase el código para ver esto era este:
+
+```{r,echo=TRUE}
 ggplot(data = colest2, aes(x = seq_along(residuos), y = residuos)) + 
   geom_point(aes(color = residuos)) + 
   scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
@@ -247,3 +267,4 @@ ggplot(data = colest2, aes(x = seq_along(residuos), y = residuos)) +
 
 ```
 
+<span style="color: red;">No me queda claro como interpretarlo en este caso</span>
