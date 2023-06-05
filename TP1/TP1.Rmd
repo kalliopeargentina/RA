@@ -228,7 +228,7 @@ qqline(model$residuals)
 ```
 
 
-<span style="color: red;">No esta normalmente distribuido</Span>
+<span style="color: red;">Están normalmente distribuidos porque el test fasllo en rechazar la hipótesis nula de que no están normalmente distribuidos</Span>
 
 ```{r,echo=TRUE, warning=FALSE}
 #install.packages("lmtest")
