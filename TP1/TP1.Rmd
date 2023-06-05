@@ -166,6 +166,10 @@ model <- lm(colest ~ edad, data = colest)
 model$coefficients
 
 ```
+```{r warning=FALSE,message=FALSE}
+(c1+ geom_smooth(method = "lm", se = TRUE, color = "black") )
+
+```
 
 
 ### (c) Estime intervalos de confianza del 95% para los coeficientes del modelo y compare estos resultados con el test de Wald para los coeficientes.Le parece que hay asociación entre estos test y el test de la regresión? 
@@ -178,12 +182,24 @@ ci
 test de Wald:
 
 ```{r}
-summary(model)
+#install.packages("aod")
+library(aod)
+coef(model)
+wald.test(Sigma = vcov(model), b = coef(model), Terms = 1)
 
 ```
 
 
 ### (d) A partir de esta recta estime los valores de E(Y) para x=25 años y  x=48 años. Podría estimarse el valor de E(Y) para x=80 años?
 
+
+```{r}
+predict(model, newdata = data.frame(edad = c(25,80)))
+```
+
 ### (e) Testee la normalidad de los residuos y haga un gráfico para ver si son homocedásticos.
+
+```{r}
+
+```
 
