@@ -228,7 +228,7 @@ qqline(model$residuals)
 ```
 
 
-Están normalmente distribuidos porque el test falló en rechazar la hipótesis nula de que no están normalmente distribuidos y el valor es cercano a uno. En el qqplot se pueden ver los valores alineados a la diagonal, lo cual indica coincidencia cercana con los cuantiles teóricos.
+Están normalmente distribuidos porque el test falló en rechazar la hipótesis nula de que no están normalmente distribuidos. En el qqplot se pueden ver los valores alineados a la diagonal, lo cual indica coincidencia cercana con los cuantiles teóricos.
 
 ```{r,echo=TRUE, warning=FALSE}
 #install.packages("lmtest")
@@ -268,3 +268,72 @@ ggplot(data = colest2, aes(x = seq_along(residuos), y = residuos)) +
 ```
 
 <span style="color: red;">No me queda claro como interpretarlo en este caso</span>
+
+## Ejercicio1.4. Una empresa desarrolló un sistema de energía solar para calentar el agua para una caldera que es parte del sistema de energía del proceso productivo.Existe el interés de controlar la estabilidad del sistema, para ello se monitorea el mismo y se registran los datos cada hora. Los datos se encuentran disponibles en el archivo energia.xlsx
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+energia <- read_excel('energia.xlsx')
+```
+
+### (a) Realizar el diagrama de dispersión y evaluar si un modelo de regresión lineal es adecuado. 
+
+```{r}
+promediosE <- colMeans(energia)
+ggplot(energia, aes(Hora, Energía)) + 
+  geom_point() +
+  geom_vline(xintercept=promediosE[1],linetype="dotted") + 
+  geom_hline(yintercept=promediosE[2],linetype="dotted") + 
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+```
+
+No parecería ser adecuado un modelo lineal
+
+### (b) Estimar un modelo lineal y verificar la normalidad de los residuos del mismo.
+
+```{r}
+
+modelE <- lm(Energía ~ Hora, data = energia)
+
+shapiro.test(modelE$residuals)
+
+```
+
+No están normalmente distribuidos porque el test rechaza la hipótesis nula de que no están normalmente distribuidos.
+
+```{r warning=FALSE}
+energia2<-energia
+energia2$prediccion <- modelE$fitted.values 
+energia2$residuos <- modelE$residuals
+
+
+ggplot(data = energia2, aes(x = prediccion, y = residuos)) + 
+  geom_point(aes(color = residuos)) + 
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
+  geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
+  labs(title = "Distribución de los residuos", x = "predicción modelo", y = "residuo") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+
+ggplot(data = energia2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+  labs(title = "Histograma de los residuos") + theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+qqnorm(model$residuals) 
+qqline(model$residuals)
+
+
+```
+Graficamos:
+
+```{r}
+
+ggplot(energia2, aes(x = prediccion, y = residuos)) +
+  geom_point(shape = 20) +
+  labs(x = "Predicción", y = "Residuos",
+       title = "Residuos vs. Predicción")
+```
+Aparentemente en este caso no hay normalidad porque hay agrupamiento de los residuos habiendo algunos puntos que se alejan mucho del resto
+
+### (c) En caso de rechazar este supuesto buscar una transformación lineal para este modelo y aplicarla. 
+### (d) Realizar el análisis diagnóstico del nuevo modelo y estimar un intervalo de confianza y un intervalo de predicción para 27.5 hs con ambos modelos. Comparar los intervalos.
+
