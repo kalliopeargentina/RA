@@ -412,14 +412,6 @@ gorr2<-gorr
 gorr2$prediccion <- model_gorr1$fitted.values 
 gorr2$residuos <- model_gorr1$residuals
 
-ggplot(data = gorr2, aes(x = prediccion, y = residuos)) + 
-  geom_point(aes(color = residuos)) + 
-  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
-  geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
-  labs(title = "Distribución de los residuos", x = "predicción modelo", y = "residuo") + 
-  theme_bw() + 
-  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
-
 ggplot(data = gorr2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
   labs(title = "Histograma de los residuos") + theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5))
@@ -433,9 +425,27 @@ shapiro.test(model_gorr1$residuals)
 
 <br>
 
-### Test de Breush-Pagan 
+### Gráfico de análisis de homocedasticidad
+
 <br>
-Analizamos si los residuos tienen varianza constante.
+Analizamos si los residuos presentan estructura en este gráfico. Si se observa algún patrón visual se podría decir que no es válido el supuesto de homocedasticidad. 
+```{r,echo=TRUE}
+ggplot(data = gorr2, aes(x = prediccion, y = residuos)) + 
+  geom_point(aes(color = residuos)) + 
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
+  geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
+  labs(title = "Distribución de los residuos", x = "predicción modelo", y = "residuo") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+```
+
+En este caso no se observa estructura en los residuos.
+
+<br>
+
+### Test de Breusch-Pagan 
+<br>
+Analizamos si los residuos tienen varianza constante (homocedasticidad) con el test de Breusch-Pagan.
 ```{r,echo=TRUE}
 #install.packages("lmtest")
 library(lmtest) 
@@ -443,6 +453,9 @@ bptest(model_gorr1)
 ```
 Concluimos que no se rechaza homocedasticidad.
 <br>
+
+### Gráfico de análisis de independencia de las observaciones
+Analizamos el gráfico de residuos según el orden de las observaciones para ver si se observa dependencia.
 ```{r,echo=TRUE}
 ggplot(data = gorr2, aes(x = seq_along(residuos), y = residuos)) + 
   geom_point(aes(color = residuos)) + 
@@ -452,6 +465,7 @@ ggplot(data = gorr2, aes(x = seq_along(residuos), y = residuos)) +
   theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
 
 ```
+No se detecta un patrón en el gráfico.
 
 <br>
 

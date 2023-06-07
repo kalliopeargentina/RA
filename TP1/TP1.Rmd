@@ -188,7 +188,7 @@ coef(model)
 wald.test(Sigma = vcov(model), b = coef(model), Terms = 1)
 
 ```
-<span style="color: red;">No se muy bien que concluir</span>
+<span style="color: red;">No se muy bien que concluir. Pero entiendo que el test de wald en este caso probaría que existe un coeficiente que es diferente de cero de forma significativa. En este caso el intervalo del coeficiente no incluye al cero, por lo cual sería consistente.</span>
 
 ### (d) A partir de esta recta estime los valores de E(Y) para x=25 años y  x=48 años. Podría estimarse el valor de E(Y) para x=80 años?
 
@@ -243,7 +243,7 @@ Habría que ver la independencia de las variables para ver si el resultado se ma
 library(car)
 dwt(model)
 ```
-La hipótesis nula de este test es la no autocorrelación, en este caso no se puede descartar la misma. Esto implica que no se sostiene el supuesto de linealidad. Por tal motivo la conclusión del test anterior no se puede aplicar.
+La hipótesis nula de este test es la no autocorrelación, en este caso no se puede descartar la misma. Esto implica que no se sostiene el supuesto de independencia. Por tal motivo la conclusión del test anterior no se puede aplicar.
 
 Graficamos:
 
@@ -288,7 +288,11 @@ ggplot(energia, aes(Hora, Energía)) +
 
 No parecería ser adecuado un modelo lineal
 
+
+
+
 ### (b) Estimar un modelo lineal y verificar la normalidad de los residuos del mismo.
+
 
 ```{r}
 
@@ -299,6 +303,14 @@ shapiro.test(modelE$residuals)
 ```
 
 No están normalmente distribuidos porque el test rechaza la hipótesis nula de que no están normalmente distribuidos.
+
+```{r}
+
+summary(modelE)
+```
+
+Más aun porque el R ajustado es bajisimo, el p-value de los coefficientes tambien y el p-value del F-test también.....
+
 
 ```{r warning=FALSE}
 energia2<-energia
@@ -318,8 +330,8 @@ ggplot(data = energia2, aes(x = prediccion, y = residuos)) +
 ggplot(data = energia2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
   labs(title = "Histograma de los residuos") + theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5))
-qqnorm(model$residuals) 
-qqline(model$residuals)
+qqnorm(modelE$residuals) 
+qqline(modelE$residuals)
 
 
 ```
@@ -335,5 +347,36 @@ ggplot(energia2, aes(x = prediccion, y = residuos)) +
 Aparentemente en este caso no hay normalidad porque hay agrupamiento de los residuos habiendo algunos puntos que se alejan mucho del resto
 
 ### (c) En caso de rechazar este supuesto buscar una transformación lineal para este modelo y aplicarla. 
+
+```{r}
+library(MASS)
+
+box_cox_result <-boxcox(Energía ~ Hora, lambda = -5:2, data = energia)
+best_box_cox <- box_cox_result$x[which.max(box_cox_result$y)]
+modelE2 <- lm((Energía)^(best_box_cox) ~ Hora, data = energia)
+summary(modelE2)
+shapiro.test(modelE2$residuals)
+```
+
+
+```{r}
+energia3<-energia
+energia3$Energía <- log(energia$Energía)
+energia3$prediccion <- modelE2$fitted.values 
+energia3$residuos <- modelE2$residuals
+
+
+ggplot(data = energia2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+  labs(title = "Histograma de los residuos") + theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+qqnorm(modelE2$residuals) 
+qqline(modelE2$residuals)
+```
+
+
+
+
+
+
 ### (d) Realizar el análisis diagnóstico del nuevo modelo y estimar un intervalo de confianza y un intervalo de predicción para 27.5 hs con ambos modelos. Comparar los intervalos.
 
