@@ -366,7 +366,7 @@ energia3$prediccion <- modelE2$fitted.values
 energia3$residuos <- modelE2$residuals
 
 
-ggplot(data = energia2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+ggplot(data = energia3, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
   labs(title = "Histograma de los residuos") + theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5))
 qqnorm(modelE2$residuals) 
@@ -380,3 +380,65 @@ qqline(modelE2$residuals)
 
 ### (d) Realizar el análisis diagnóstico del nuevo modelo y estimar un intervalo de confianza y un intervalo de predicción para 27.5 hs con ambos modelos. Comparar los intervalos.
 
+```{r}
+
+shapiro.test(modelE2$residuals)
+```
+Con el test de shapiro-wilk ahora no se descarta normalidad.
+
+
+
+Los intervalos de confianza son:
+
+```{r}
+ci <- confint(modelE2, level = 0.95)
+ci
+
+```
+Predicción:
+```{r}
+predict(modelE2, newdata = data.frame(Hora = c(27.5)))
+```
+```{r}
+promediosE2 <- colMeans(energia3)
+ggplot(energia3, aes(Hora, Energía)) + 
+  geom_point() +
+  geom_vline(xintercept=promediosE2[1],linetype="dotted") + 
+  geom_hline(yintercept=promediosE2[2],linetype="dotted") + 
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+```
+
+
+<span style="color: red;">No termino de entender el sentido de este ejercicio, a las claras se ve que no hay un fit muy adecuado con una recta ¿para que tanta manipulación? Es como querer encajarlo a martillazos </span>
+
+# 1.4.Tratamiento de la heterocedasticidad
+
+## Ejercicio1.5. Se obtuvieron datos históricos del mercado inmobiliario de una  ciudad de Nueva Taipei,en Taiwan.La base es inmobiliaria.xlsx. 
+
+Las características son:  
+
+edad: Edad de la propiedad (en años). 
+distancia: La distancia a la estación de transporte más cercana (en metros).
+negocios: Cantidad de negocios de conveniencia en las cercanías a una distancia realizable a pie.
+latitud: Latitud de la ubicación de la propiedad (en grados).
+longitud: Longitud de la ubicación de la propiedad (en grados). 
+precio: Precio por metro cuadrado (en miles de dólares) 
+
+Se quiere investigar si el precio de las propiedades puede ser estimado en función de alguna de las variables disponibles. 
+
+### (a) Analizar si el precio depende de alguna de las variables. 
+### (b) Estudiar la linealidad de la relación precio-distancia.
+### (c) Estimar los coeficientes del modelo y realizar el análisis diagnóstico de los residuos del mismo. Utilizar para este análisis los gráficos de residuos versus valores ajustados, el qq-plot de los residuos, la grafica de residuos versus leverage. 
+### (d) Aplicar los test de Durbin-Watson Breush-Pagan.
+### (e) Analice la presencia de outlier y verifique si coinciden con los puntos influyentes.
+
+# 1.5. Cuadrados Mínimos Ponderados
+
+## Ejercicio1.6. En la base estudio.xlsx se encuentran registradas las horas de  estudios referidas por un conjunto de estudiantes y su calificación en la evaluación final.
+
+### (a) Ajuste un modelo de regresión simple para estimar la nota final en función de las horas dedicadas al estudio.
+### (b) Estudie el cumplimiento de los supuestos del modelo, gráfica y analíticamente.
+### (c) Ajuste un modelo de mínimos cuadrados ponderados definiendo los pesos de tal manera que las observaciones con menor varianza tengan más peso.
+### (d) Realice el análisis diagnóstico del segundo modelo ajustado.
+### (e) Compare ambos ajustes realizados y concluya.
