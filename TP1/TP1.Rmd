@@ -399,7 +399,7 @@ Predicción:
 ```{r}
 predict(modelE2, newdata = data.frame(Hora = c(27.5)))
 ```
-```{r}
+```{r message=FALSE}
 promediosE2 <- colMeans(energia3)
 ggplot(energia3, aes(Hora, Energía)) + 
   geom_point() +
@@ -425,11 +425,115 @@ latitud: Latitud de la ubicación de la propiedad (en grados).
 longitud: Longitud de la ubicación de la propiedad (en grados). 
 precio: Precio por metro cuadrado (en miles de dólares) 
 
+
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+propiedades <- read_delim('inmobiliaria.csv',col_names = TRUE,delim=";")
+```
+
 Se quiere investigar si el precio de las propiedades puede ser estimado en función de alguna de las variables disponibles. 
 
 ### (a) Analizar si el precio depende de alguna de las variables. 
+<span style="color: red;">No me queda claro el sentido de trabajar con latitud y longitud, sobre todo por separado. Quizas estaría bueno hacer una regresion multivariada en ese caso. En tal caso haría algo así: http://www.geo.hunter.cuny.edu/~ssun/R-Spatial/spregression.html</span>
+
+```{r message=FALSE}
+promediosP <- colMeans(propiedades)
+c1 <- ggplot(propiedades, aes(edad, precio)) + 
+  geom_point() +
+  geom_vline(xintercept=promediosP[1],linetype="dotted") + 
+  geom_hline(yintercept=promediosP[6],linetype="dotted") +
+   geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+c2 <- ggplot(propiedades, aes(distancia, precio)) + 
+  geom_point() + 
+  geom_vline(xintercept=promediosP[2],linetype="dotted") +
+  geom_hline(yintercept=promediosP[6],linetype="dotted") + 
+   geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+c3 <- ggplot(propiedades, aes(negocios, precio)) + 
+  geom_point() +
+  geom_vline(xintercept=promediosP[3],linetype="dotted") + 
+  geom_hline(yintercept=promediosP[6],linetype="dotted") + 
+   geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+
+grid.arrange(c1,c2,c3, ncol = 3, nrow = 1)
+```
+
+```{r}
+
+biNormTest <- mvn(data = propiedades[c(6,1)], mvnTest = "hz")
+print(biNormTest$multivariateNormality$MVN)
+biNormTest <- mvn(data = propiedades[c(6,2)], mvnTest = "hz")
+print(biNormTest$multivariateNormality$MVN)
+biNormTest <- mvn(data = propiedades[c(6,3)], mvnTest = "hz")
+print(biNormTest$multivariateNormality$MVN)
+```
+
+En ninguno de los tres casos da positivo el test de binormalidad, por lo tanto para ver la correlación voy a usar spearman
+
+```{r warning=FALSE}
+cor.test(propiedades$precio,propiedades$edad,method="spearman")$p.value
+cor.test(propiedades$precio,propiedades$distancia,method="spearman")$p.value
+cor.test(propiedades$precio,propiedades$negocios,method="spearman")$p.value
+```
+En este caso estarían todas correlacionadas
+
+
+
 ### (b) Estudiar la linealidad de la relación precio-distancia.
+
+```{r}
+
+modelProp <- lm(precio ~ distancia, data = propiedades)
+
+shapiro.test(modelProp$residuals)
+```
+No estan normalmente distribuidos los residuos porque el test valida la hipotesis alternativa de que no lo estan.
+
+
 ### (c) Estimar los coeficientes del modelo y realizar el análisis diagnóstico de los residuos del mismo. Utilizar para este análisis los gráficos de residuos versus valores ajustados, el qq-plot de los residuos, la grafica de residuos versus leverage. 
+
+
+```{r}
+prop2<-propiedades
+prop2$prediccion <- modelProp$fitted.values 
+prop2$residuos <- modelProp$residuals
+
+
+ggplot(data = prop2, aes(x = prediccion, y = residuos)) + 
+  geom_point(aes(color = residuos)) + 
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
+  geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
+  labs(title = "Distribución de los residuos", x = "predicción modelo", y = "residuo") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+
+ggplot(data = prop2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+  labs(title = "Histograma de los residuos") + theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+qqnorm(modelProp$residuals) 
+qqline(modelProp$residuals)
+```
+
+De todas maneras, esto parece ser más producto de outliers que otra cosa.
+
+
+Otra forma de verlo:
+```{r}
+par(mfrow=c(2,2))
+plot(modelProp)
+par(mfrow=c(1,1))
+```
+El dato 266 al menos parece ser outlier
+
+```{r}
+
+summary(influence.measures(model = modelProp))
+
+```
+
+
 ### (d) Aplicar los test de Durbin-Watson Breush-Pagan.
 ### (e) Analice la presencia de outlier y verifique si coinciden con los puntos influyentes.
 
