@@ -3,6 +3,12 @@ title: "TP1 Regresión Lineal Simple"
 author: "Marcos Buccellato"
 date: '2023-06-01'
 output:
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
   html_document:
     toc: yes
     toc_depth: 5
@@ -10,12 +16,6 @@ output:
     toc_float:
       collapsed: no
       smooth_scroll: yes
-  pdf_document:
-    toc: yes
-    toc_depth: '5'
-  word_document:
-    toc: yes
-    toc_depth: '5'
 editor_options:
   markdown:
     wrap: 72
@@ -527,16 +527,17 @@ par(mfrow=c(1,1))
 ```
 El dato 266 al menos parece ser outlier
 
-```{r}
-
-summary(influence.measures(model = modelProp))
-
-```
 
 
 ### (d) Aplicar los test de Durbin-Watson Breush-Pagan.
 ### (e) Analice la presencia de outlier y verifique si coinciden con los puntos influyentes.
 
+
+```{r}
+
+summary(influence.measures(model = modelProp))
+
+```
 # 1.5. Cuadrados Mínimos Ponderados
 
 ## Ejercicio1.6. En la base estudio.xlsx se encuentran registradas las horas de  estudios referidas por un conjunto de estudiantes y su calificación en la evaluación final.
