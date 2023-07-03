@@ -478,6 +478,10 @@ cor.test(propiedades$precio,propiedades$negocios,method="spearman")$p.value
 ```
 En este caso estarían todas correlacionadas
 
+```{r}
+library(corrplot)
+corrplot(cor(propiedades,method="s"))
+```
 
 
 ### (b) Estudiar la linealidad de la relación precio-distancia.
@@ -499,8 +503,7 @@ prop2<-propiedades
 prop2$prediccion <- modelProp$fitted.values 
 prop2$residuos <- modelProp$residuals
 
-
-ggplot(data = prop2, aes(x = prediccion, y = residuos)) + 
+d1 <- ggplot(data = prop2, aes(x = prediccion, y = residuos)) + 
   geom_point(aes(color = residuos)) + 
   scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
   geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
@@ -509,11 +512,12 @@ ggplot(data = prop2, aes(x = prediccion, y = residuos)) +
   theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
 
 
-ggplot(data = prop2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+d2<- ggplot(data = prop2, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
   labs(title = "Histograma de los residuos") + theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5))
 qqnorm(modelProp$residuals) 
 qqline(modelProp$residuals)
+grid.arrange(d1,d2,nrow = 2)
 ```
 
 De todas maneras, esto parece ser más producto de outliers que otra cosa.
@@ -530,6 +534,16 @@ El dato 266 al menos parece ser outlier
 
 
 ### (d) Aplicar los test de Durbin-Watson Breush-Pagan.
+```{r}
+#Durbin-Watson
+library(lmtest)
+dwtest(modelProp,alternative ="two.sided",iterations=1000)
+
+
+```
+No rechaza la hipótesis de NO autocorrelación y no tienen distribución normal.... no serían independientes pero <span style="color:darkred">No me queda claro como sería el tema cuando no es normal la distribución como interpretar el test de independencia.</span>
+
+
 ### (e) Analice la presencia de outlier y verifique si coinciden con los puntos influyentes.
 
 
@@ -542,8 +556,193 @@ summary(influence.measures(model = modelProp))
 
 ## Ejercicio1.6. En la base estudio.xlsx se encuentran registradas las horas de  estudios referidas por un conjunto de estudiantes y su calificación en la evaluación final.
 
+```{r}
+
+estudio16 <- read_delim('estudio.csv',col_names = TRUE,delim=";",show_col_types = FALSE)
+```
+
+
 ### (a) Ajuste un modelo de regresión simple para estimar la nota final en función de las horas dedicadas al estudio.
+
+```{r}
+
+model16 <- lm(puntaje ~ horas_estudio, data = estudio16)
+promedios16 <- colMeans(estudio16)
+ggplot(estudio16, aes(horas_estudio, puntaje)) + 
+  geom_point() +
+  geom_vline(xintercept=promedios16[1],linetype="dotted") + 
+  geom_hline(yintercept=promedios16[2],linetype="dotted") +
+   geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+
+```
+
 ### (b) Estudie el cumplimiento de los supuestos del modelo, gráfica y analíticamente.
+
+**Análisis gráfico**
+
+De la gráfica que se puede ver en el punto **a)** encontramos que hay algunos puntos que parecen ser outliers e influyentes. Vemos que en apariencia la estimación lineal puede ser apropiada pero es probable que estos puntos influyentes afecten la estimación.
+
+**Indicadores**
+
+Testeamos la binormalidad primero para ver que método usamos para estimar correlación.
+```{r}
+biNormTest16 <- mvn(data = estudio16, mvnTest = "hz")
+print(biNormTest16$multivariateNormality)
+```
+Como este test da negativo, entonces debo usar el método de Spearman para ver la correlación.
+
+```{r}
+
+corTest16 <- cor.test(estudio16$horas_estudio, estudio16$puntaje, method = "spearman") 
+corTest16
+```
+Da una correlación positiva con un p-valor muy bajo, verificando lo sospechado en el análisis gráfico.
+```{r}
+summary(model16)
+```
+ Si vemos los resultados del modelo lineal podemos verificar lo mismo. Tenemos bajos p-valores en la prueba de wald de los coeficientes y un p-valor bajo el test F. Vemos tambien que tanto R como R-ajustado nos indican que esta relación explica el 50% de los datos y esto coincide con el análisis previo. 
+ 
+**Normalidad de los residuos**
+
+Estudiemos si hacer una regresión lineal es la mejor opción:
+
+```{r}
+
+shapiro.test(model16$residuals)
+```
+La hipotesis nula de este test es que los residuos están normalmente distribuidos y la alternativa es que no lo están, como el test rechaza la hipótesis nula, concluimos que no están normalmente distribuidos. Veamoslo en un qqplot
+
+```{r}
+qqnorm(model16$residuals) 
+qqline(model16$residuals)
+```
+Vemos algunos puntos en los extremos que se alejan. Pero parte de las discrepancias podrían deberse a outliers.
+
+```{r}
+
+model16b <- data.frame(prediccion = model16$fitted.values,
+                       residuos = model16$residuals)
+
+
+d1_16 <- ggplot(data = model16b, aes(x = prediccion, y = residuos)) + 
+  geom_point(aes(color = residuos)) + 
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") + 
+  geom_hline(yintercept = 0) + geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) + 
+  labs(title = "Distribución de los residuos", x = "predicción modelo", y = "residuo") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+
+d2_16<- ggplot(data = model16b, aes(x = residuos)) + geom_histogram(aes(y = ..density..)) + 
+  labs(title = "Histograma de los residuos") + theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+grid.arrange(d1_16,d2_16,nrow = 2)
+```
+Vemos una cierta fórma cónica en los residuos y que la distribución no parece muy normal.
+
+Veamos ahora si los residuos estan aoutocorrelacionados, es decir si hay algún tipo de relación entre lo que paso en una medida y las siguientes. A priori conceptualmente no debería haberlas, pero por ahí detectamos autocorrelación y eso nos podría cuestionar la forma en la que se tomaron las mediciones por ejemplo.
+
+```{r}
+#Durbin-Watson
+dwtest(model16,alternative ="two.sided",iterations=1000)
+```
+La hipótesis nula es que NO hay autocorrelación.  
+
+Analizemos la heterocedasticidad de los residuos.
+
+```{r}
+bptest(model16)
+```
+Los residuos son heterocedasticos porque se rechaza la hipotesis nula de homocedasticidad. Es decir que la varianza no es constante para los diversos valores estimados.
+
+**Resumen:**
+
+ * Normalidad: NO
+ * Independencia: Sí (que no sean normales no afecta?)
+ * Homcedasticidad: NO
+
+
+**Outliers**
+
+ Hagamos un análisis gráfico de otra forma menos vistosos pero más rápido: 
+```{r}
+par(mfrow=c(2,2))
+plot(model16)
+par(mfrow=c(1,1))
+
+```
+Ya habíamos adelantado que podía haber outliers que sean puntos influyentes. De este análisis gráfico rápido, surgen algunos posibles candidatos.
+
+
+```{r}
+summary(influence.measures(model = model16))
+```
+El punto 36 parece ser el más obvio candidato
+
+```{r}
+outlierTest(model16)
+```
+```{r}
+influencePlot(model = model16)
+influenceIndexPlot(model16, vars='Bonf', las=1,col='green')
+
+```
+Podemos concluir que el punto 36 es un outlier
+
 ### (c) Ajuste un modelo de mínimos cuadrados ponderados definiendo los pesos de tal manera que las observaciones con menor varianza tengan más peso.
+
+Creamos un vector de ponderaciones que devuelve los valores que salen de la regresión lineal entre los residuos en valor absoluto del modelo original y sus valores estimados y al reciproco lo elevamos al cuadrado. Es decir que construimos un estimador de el residuo dado su valor estimado, lo elevamos al cuadrado para potenciar la diferencia y luego aplicamos la reciproca para que esa diferencia penalice más.
+
+```{r, echo=TRUE}
+ww<-1 / lm(abs(model16$residuals) ~ model16$fitted.values)$fitted.values^2
+
+plot(estudio16$horas_estudio,estudio16$puntaje,xlab="Horas de estudio",ylab="Puntaje",
+     main="Horas vs Puntaje")
+
+abline(model16,col="darkviolet",lwd=2)
+
+model16_ww<- lm(puntaje ~ horas_estudio, data = estudio16,weights =ww)
+abline(model16_ww,col="hotpink",lwd=2)
+```
+Comparando graficamente vemos que ambas regresiones son diferentes y la ajustada no se ve tan influenciada por el valor 36, por tal motivo tiene una pendiente mayor. Pero este ajuste también suaviza los efectos de cualquier otro residuo alejado
 ### (d) Realice el análisis diagnóstico del segundo modelo ajustado.
+Hagamos el diagnóstico anterior:
+
+
+**Modelo lineal**
+```{r}
+summary(model16_ww)
+```
+Los p-valores del  test de wald, los coeficientes dan ok. Pero ahora el R y R ajustado explican el 76% de los datos, lo cual mejora mucho el modelo.
+
+**Normalidad de los residuos**
+
+```{r}
+
+shapiro.test(model16_ww$residuals)
+```
+La hipotesis nula de este test es que los residuos están normalmente distribuidos y la alternativa es que no lo están, como el test rechaza la hipótesis nula, concluimos que no están normalmente distribuidos al igual que el modelo anterior.
+
+
+**Independencia de los residuos**
+
+<span style="color: red;">Como se hace esto para modelos ponderados</span>
+
+**Homocedasticidad**
+
+```{r}
+bptest(model16_ww)
+```
+Los residuos son homocedasticos porque no se rechaza en este caso la hipotesis nula de homocedasticidad.
+
+**Resumen**
+
+* Normalidad de residuos: NO
+* Independencia: SÍ
+* Homocedasticidad: SÍ
+
 ### (e) Compare ambos ajustes realizados y concluya.
+
+Se compararon los modelos y en los puntos anteriores.

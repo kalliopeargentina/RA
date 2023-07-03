@@ -1,0 +1,819 @@
+---
+title: "RA TP 2 - Modelo Lineal Multivariado"
+date: "2023-06-20"
+output:
+   rmdformats::downcute:
+      downcute_theme: "chaos"
+---
+
+```{r setup, include=FALSE}
+
+rm( list= ls(all.names= TRUE) )  #remove all objects
+gc( full= TRUE )                 #garbage collection
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE)
+
+#DT:::DT2BSClass(c('compact', 'cell-border'))
+
+``` 
+
+``` {r librerias}
+packages <- c('mctest','olsrr','ggplot2','dplyr','readxl','MVN','stringr',
+  'gridExtra','ragg','reshape2','aod','lmtest','kableExtra','nortest',
+  'car','MASS','GGally','stats','ggrepel','broom', 'leaps')
+
+packLoad <- lapply(packages, require, character.only = TRUE) 
+library(DT,kableextra)
+
+```
+
+```{r accesorio}
+
+mostrarDF <- function(df, rows=5){
+  datatable(df,
+    options = list(
+    pageLength = rows#,
+    #dom = 'pt'
+    )
+  )
+}
+
+```
+
+# 2.1 Modelo aditivo
+
+## **Ejercicio 2.1**. Con el set de datos trees, disponible en la biblioteca dplyr de R.
+pretendemos ajustar un modelo que estimo el volumen (en pies cúbicos) de los
+árboles de cerezo en función de la longitud de su circunferencia (en pulgadas)
+y de su altura (en pies).
+
+```{r e2_1_readTrees}
+  
+tr <- trees
+mostrarDF(tr)
+
+```
+
+
+## 2.1 a) Visualizar la asociación entre las variables de a pares.
+```{r e2_1_a_Pairs}
+
+ggpairs(tr) +
+  theme_bw()
+
+```
+
+## 2.1 b) Ajuste un modelo lineal simple para cada una de las dos predictoras disponibles.
+**Modelo Lineal Simple 1 - Girth**
+```{r e2_1_b_Modelo1Girth}
+tr.lm.g <- lm(Volume ~ Girth, tr)
+summary(tr.lm.g)
+```
+
+**Modelo Lineal Simple 2 - Height**
+```{r e2_1_b_Modelo2_Height}
+
+tr.lm.h <- lm(Volume ~ Height, tr)
+summary(tr.lm.h)
+```
+
+## 2.1 c) Realice un análisis diagnóstico en cada caso y señale en caso de haberlos puntos influyentes y outliers.
+
+**Analisis Diagnostico modelo lineal simple 1 - Girth**
+
+```{r e2_1_c_Modelo1_Diag}
+modAnalisis <- tr.lm.g
+
+shapiro.test(modAnalisis$residuals)
+bptest(modAnalisis)
+dwt(modAnalisis)
+
+```
+> ### Resultados
+> 
+> **Normalidad:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. (Es normal)
+> 
+> **Homocedasticidad:** el p-valor es menor a 0.05, se rechaza la hipotesis nula. (No es Homocedastico, con un alfa de 0.01 podria no rechazarse)
+> 
+> **Independencia:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula.
+(Son Independientes ya que hay normalidad)
+> 
+
+**Outliers y Puntos influyentes Modelo lineal simple 1 - Girth**
+
+```{r e2_1_c_Modelo1_Outliers, collapse = TRUE}
+
+cat('Puntos Influyentes segun Cook\n')
+dcook <- cooks.distance(modAnalisis)
+which(dcook>4/dim(tr)[1])
+
+cat('\nPuntos Influyentes segun HatValues\n')
+lev <- hatvalues(modAnalisis)
+infl <- which(lev>2*1/dim(tr)[1])
+infl
+
+cat('\nOutliers segun Bonferroni\n')
+out <- outlierTest(modAnalisis)
+print(out)
+
+```
+
+**Grafico de Outliers y puntos influyentes**
+```{r  e2_1_c_Modelo1_OutliersGraf}
+
+influenceIndexPlot(modAnalisis, vars='bonf', las=1,col='blue')
+influenceIndexPlot(modAnalisis, vars='cook', las=1,col='blue')
+
+ggplot(data = tr, mapping = aes(x = Girth, y = Volume, label = ifelse(rownames(tr) %in% infl,rownames(tr), ""))) + #
+  geom_point() +
+  geom_abline(slope = modAnalisis$coefficients[2], intercept = modAnalisis$coefficients[1]) +
+  geom_label_repel()
+
+```
+Nos quedamos con el valor 31 como un outlier y punto influyente
+
+
+**Analisis Diagnostico modelo lineal simple 2 - Height**
+
+```{r  e2_1_c_Modelo2_Diag, collapse=TRUE}
+modAnalisis <- tr.lm.h
+
+shapiro.test(modAnalisis$residuals)
+
+bptest(modAnalisis)
+
+dwt(modAnalisis)
+
+```
+> ###Resultados
+> **Normalidad**: el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. (Es normal)
+> 
+> **Homocedasticidad**: el p-valor es menor a 0.05, se rechaza la hipotesis nula. (No es Homocedastico)
+> 
+> **Independencia**: el p-valor es menor a 0.05, se rechaza la hipotesis nula. (No son Independientes)
+
+**Outliers y Puntos influyentes Modelo lineal simple 1 - Girth**
+
+```{r e2_1_c_Modelo2_Outliers, collapse=TRUE}
+
+cat('Puntos Influyentes segun Cook\n')
+dcook <- cooks.distance(modAnalisis)
+which(dcook>4/dim(tr)[1])
+
+cat('\nPuntos Influyentes segun HatValues\n')
+lev <- hatvalues(modAnalisis)
+infl <- which(lev>2*1/dim(tr)[1])
+infl
+
+cat('\nOutliers segun Bonferroni\n')
+out <- outlierTest(modAnalisis)
+print(out)
+
+```
+
+**Grafico de Outliers y Puntos Influyentes**
+```{r  e2_1_c_Modelo2_OutliersGraf}
+
+influenceIndexPlot(modAnalisis, vars='bonf', las=1,col='blue')
+influenceIndexPlot(modAnalisis, vars='cook', las=1,col='blue')
+
+ggplot(data = tr, mapping = aes(x = Height, y = Volume, label = ifelse(rownames(tr) %in% infl,rownames(tr), ""))) +
+  geom_point() +
+  geom_abline(slope = modAnalisis$coefficients[2], intercept = modAnalisis$coefficients[1]) +
+  geom_label_repel()
+
+```
+Nos quedamos con el valor 31 y  como un outlier y punto influyente
+
+El valor 18 es un punto influyente que no es un outlier
+
+
+## 2.1 d) Estime un intervalo de confianza para los coeficientes del modelo lineal estimado en cada caso.
+```{r e2_1_d_IntConf, collapse=TRUE}
+
+cat('Intervalo de confianza - Modelo Girth\n')
+confint(tr.lm.g)
+
+cat('\nIntervalo de confianza - Modelo Height\n')
+confint(tr.lm.h)
+
+```
+
+## 2.1 e) Ajuste un nuevo modelo sin la/s observaciones influyentes.
+```{r e2_1_e_ModeloSinInfluyentes, collapse=TRUE}
+
+tr.lm.g2 <- lm(Volume ~ Girth, tr[-31,]) #quitamos la observacion 31
+tr.lm.h2 <- lm(Volume ~ Height, tr[c(-31,-18),]) #quitamos las observaciones 18 y 31
+
+cat('Modelo Lineal Simple 1 - Girth\n')
+summary(tr.lm.g2)
+cat('\nModelo Lineal Simple 2 - Height\n')
+summary(tr.lm.h2)
+
+```
+
+## 2.1 f) Construya el intervalo de confianza y el de predicción del 95 % para un árbol cuyo diámetro es 16.1 pulgadas
+```{r e2_1_f_IntConfPrediccion, collapse=TRUE}
+
+cat('Intervalo de confianza - Modelo Girth2\n')
+intervalosConf <- predict(object = tr.lm.g2, newdata = data.frame(Girth = 16.1),
+    interval = "confidence", level = 0.95) 
+intervalosConf
+
+cat('\nIntervalo de prediccion - Modelo Girth2\n')
+intervalosPred <- predict(object = tr.lm.g2, newdata = data.frame(Girth = 16.1),
+    interval = "prediction", level = 0.95) 
+intervalosPred
+
+```
+
+## 2.1 g) Ajuste un modelo utilizando conjuntamente las dos variables predictoras y compare este ajuste con el mejor de los modelos anteriores mediante un test de modelos anidados. Concluya.
+```{r e2_1_g_ModeloFull, collapse=TRUE}
+
+tr.lm <- lm(Volume ~ Girth+Height, tr)
+cat('Modelo Lineal Multiple (Girth + Height)\n')
+summary(tr.lm)
+
+```
+El R2 del nuevo modelo con ambas variables da mayor que el mejor de los anteriores
+
+```{r e2_1_g_ModeloFull_Graf}
+
+ggplot(data = tr, mapping = aes(x = Girth, y = tr.lm$residuals, label = ifelse(rownames(tr) %in% infl,rownames(tr), ""))) +
+  geom_point() +
+  geom_label_repel()
+
+ggplot(data = tr, mapping = aes(x = Height, y = tr.lm$residuals, label = ifelse(rownames(tr) %in% infl,rownames(tr), ""))) +
+  geom_point() +
+  geom_label_repel()
+
+```
+
+```{r e2_1_g_ModeloFullSinInfluyente, collapse=TRUE}
+tr.lm2 <- lm(Volume ~ Girth+Height, tr[c(-31),])
+cat('Modelo Lineal Multiple (Girth + Height)\n')
+summary(tr.lm2)
+```
+
+
+```{r e2_1_g_EvalModelos}
+
+g <- rbind(glance(tr.lm),
+           glance(tr.lm2),
+           glance(tr.lm.g),
+           glance(tr.lm.g2),
+           glance(tr.lm.h),
+           glance(tr.lm.h2)
+           )
+nombres <- c('Multi','Multi Sin Inf','Girth','Girth Sin Influyente','Height','Height Sin Influyente')
+g <- cbind(round(g,3),nombres)
+
+mostrarDF(g,10)
+
+```
+En base a estas comparaciones consideramos que el modelo con el mejor resultado es el modelo multivariado sin el outlier (31)
+
+
+# 2.2 Modelo con Interacción
+
+## **Ejercicio 2.2**. El departamento de ventas de una empresa quiere estudiar la influencia que tienen los distintos canales de publicidad sobre las ventas de un producto recién lanzado al mercado. Se dispone de un conjunto de datos que contiene los ingresos (en millones) conseguido por ventas en 200 regiones, así como la cantidad de presupuesto, también en millones, destinado a anuncios por radio, TV y periódicos en cada una de ellas. Los datos están disponibles en la base publicidad.xlsx .
+
+```{r e2_2_LeerPublicidad}
+pb <- read_xlsx('publicidad.xlsx')
+mostrarDF(pb)
+```
+
+## 2.2 a) Ajustar un modelo de regresión lineal simple para cada una de las variables predictoras por separado. Realizar a continuación el análisis diagnóstico de los modelos.
+
+**Modelo TV**
+```{r e2_2_a_ModeloTV_Diag, collapse=TRUE}
+pb.lm.tv<- lm(ventas~tv, data=pb)
+summary(pb.lm.tv)
+
+shapiro.test(pb.lm.tv$residuals)
+bptest(pb.lm.tv)
+dwt(pb.lm.tv)
+
+```
+> ### Resultados Modelo TV
+> 
+> **Normalidad:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. (Es normal)
+> 
+> **Homocedasticidad:** el p-valor es menor a 0.05, se rechaza la hipotesis nula. Los residuos no son homocedasticos
+> 
+> **Independencia:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. (Son Independientes ya que hay normalidad)
+
+**Modelo Radio**
+```{r e2_2_a_ModeloRadio_Diag, collapse=TRUE}
+pb.lm.ra<- lm(ventas~radio, data=pb)
+summary(pb.lm.ra)
+
+shapiro.test(pb.lm.ra$residuals)
+bptest(pb.lm.ra)
+dwt(pb.lm.ra)
+```
+> ### Resultados Modelo Radio
+> 
+> **Normalidad**: el p-valor es menor a 0.05, se rechaza la hipotesis nula. (No es normal)
+> 
+> **Homocedasticidad**: el p-valor es menor a 0.05, se rechaza la hipotesis nula. Los residuos no son homocedasticos
+> 
+> **Independencia**: el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. Los residuos son no autocorrelacionados.
+
+**Modelo Periodico**
+```{r e2_2_a_ModeloPer_Diag, collapse=TRUE}
+pb.lm.per<- lm(ventas~periodico, data=pb)
+summary(pb.lm.per)
+
+cat('\nAnalisis diagnostico\n')
+cat('\nNormalidad de los Residuos\n')
+shapiro.test(pb.lm.per$residuals)
+
+cat('\nHomocedasticidad de los Residuos\n')
+bptest(pb.lm.per)
+
+cat('\nIndependencia de los Residuos\n')
+dwt(pb.lm.per)
+```
+> ### Resultados Modelo Periodico
+> 
+> **Normalidad:** el p-valor es menor a 0.05, se rechaza la hipotesis nula.(No es normal)
+> 
+> **Homocedasticidad:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. Los residuos son homocedasticos
+> 
+> **Independencia:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. Los residuos son no autocorrelacionados.
+
+## 2.2 b) Ajustar un modelo aditivo con las tres variables y decidir si alguna de ellas no es significativa (test de Wald).
+
+**Modelo Completo (Diario Radio y Periodico)**
+```{r e2_2_b_ModeloFull_Test, collapse=TRUE}
+pb.lm<-lm(ventas~., data=pb[,-1])
+summary(pb.lm)
+pb.hz <- mvn(pb[2:4])
+print(pb.hz)
+
+```
+Los predictores radio y tv son significativas para el modelo, mientras que periodicos no. Ninguna de las 3 variables es normal, por lo que consecuentemente el modelo con las tres variables no lo es. R cuadrado ajustado es de 0.89, el p valor del modelo da significativo.
+
+## 2.2 c) Ajustar los modelos de a pares y quedarse con el que mejor explique la variable respuesta utilizando el criterio de AIC, R2 y Cp_Mallows.
+
+
+```{r e2_2_c_ModelosPares}
+pb.lm.par1<-lm(ventas~ tv+radio, data=pb)
+pb.lm.par2<-lm(ventas~ tv+periodico, data=pb)
+pb.lm.par3<-lm(ventas~ periodico+radio, data=pb)
+```
+
+
+```{r e2_2_c_EvalModelos}
+pb.info <- rbind(glance(pb.lm.par1),
+           glance(pb.lm.par2),
+           glance(pb.lm.par3),
+           glance(pb.lm.per),
+           glance(pb.lm.ra),
+           glance(pb.lm.tv),
+           glance(pb.lm)
+           )
+           
+nombres <- c('tvradio','tvper','peradio','per','ra','tv','total')
+pb.info <- cbind(nombres, pb.info)
+
+pb.info['cp_mallows']<-NA
+pb.info[1,14]<- ols_mallows_cp(pb.lm.par1, pb.lm)
+pb.info[2,14]<- ols_mallows_cp(pb.lm.par2, pb.lm)
+pb.info[3,14]<- ols_mallows_cp(pb.lm.par3, pb.lm)
+pb.info[4,14]<- ols_mallows_cp(pb.lm.per, pb.lm)
+pb.info[5,14]<- ols_mallows_cp(pb.lm.ra, pb.lm)
+pb.info[6,14]<- ols_mallows_cp(pb.lm.tv, pb.lm)
+pb.info[7,14]<- ols_mallows_cp(pb.lm, pb.lm)
+
+
+pb.info<-pb.info[,c('nombres','adj.r.squared', 'AIC', 'cp_mallows')]
+mostrarDF(arrange(pb.info, AIC),7)
+```
+El modelo que tiene el menor AIC y cp de mallows y mayor r cuadrado ajustado es el que incluye tv y radio para explicar las ventas
+
+
+## 2.2 d) Grafique para el modelo seleccionado el plano de ajuste y evalue si le parece adecuado.
+
+```{r e2_2_d_PlanoAjuste}
+rango_tv <- range(pb$tv)
+rango_radio <- range(pb$radio) 
+
+nuevos_valores_tv <- seq(from = rango_tv[1], to = rango_tv[2], length.out = 20) 
+nuevos_valores_radio <- seq(from = rango_radio[1], to = rango_radio[2], length.out = 20)
+
+g<-function(tv, radio) 
+   {predict(object = pb.lm.par1, newdata = data.frame(tv, radio)) }
+
+predicciones <- outer(
+  X= nuevos_valores_tv, 
+  Y = nuevos_valores_radio, 
+  FUN = g)
+
+superficie <- persp(x = nuevos_valores_tv, y = nuevos_valores_radio, z = predicciones, theta = 18, phi = 20, col = "lightblue", shade = 0.1, xlab = "tv", ylab = "radio", zlab = "ventas", ticktype = "detailed", main = "Prediccion ventas en funcion de tv y radio")
+
+observaciones <- trans3d(pb$tv, pb$radio, pb$ventas, superficie) 
+error <- trans3d(pb$tv, pb$radio, fitted(pb.lm.par1), superficie) 
+points(observaciones, col = "red", pch = 16)
+segments(observaciones$x, observaciones$y, error$x, error$y)
+
+```
+Los puntos estan sobre o muy cerca del plano, con lo cual consideramos adecuado el modelo.
+
+## 2.2 e) Considere el mejor modelo pero ahora con interacción. Compare los modelos con y sin interacción.
+
+```{r}
+pb.lm.inter<-lm(ventas~ tv*radio, pb)
+summary(pb.lm.inter)
+glance(pb.lm.inter)
+ols_mallows_cp(pb.lm.inter, pb.lm)
+```
+El R cuadrado ajustado y AIC del nuevo modelo considerando interaccion dieron mejores resultados respecto al mejor modelo sin interaccion.
+
+
+# 2.3 Regresoras categoricas
+
+## **Ejercicio 2.3**. Con la base de datos Salaries con 397 registros de 6 variables de la biblioteca carData de R. 
+
+> * rank factor con tres niveles : AssocProf, AsstProf y Prof.
+> * discipline factor con dos niveles A (departamentos teóricos) o B (departamentos aplicados).
+> * yrs.since.phd años transcurridos desde el doctorado.
+> * yrs.service años de servicio.
+> * sex factor con dos niveles Femenino y Masculino.
+> * salary salario por nueve meses en dólares.
+
+```{r e2_3_LeerSalaries, echo=TRUE, collapse=TRUE}
+
+sal<-Salaries
+mostrarDF(sal)
+
+```
+
+
+## 2.3 a) Ajustar un modelo lineal para estimar el salario en función del sexo.
+```{r e2_3_a_ModeloSex, echo=TRUE, collapse=TRUE}
+sal.lm.sex<- lm(salary~sex, data=sal)
+summary(sal.lm.sex)
+```
+
+## 2.3 b) Ajustar un modelo lineal para estimar el salario en función de los años de servicio.
+
+```{r e2_3_b_ModeloYearsService, echo=TRUE, collapse=TRUE}
+sal.lm.ant<- lm(salary~yrs.service, data = sal)
+summary(sal.lm.ant)
+```
+
+## 2.3 c) Encontrar el modelo lineal que produzca el mejor ajuste con dos variables. Es necesario considerar interacción?
+
+
+```{r e2_3_ModeloMejorDosVar, echo=TRUE, collapse=TRUE}
+
+sal.subset <- regsubsets(salary ~ ., data = sal, nvmax = 10) 
+summary(sal.subset)
+summary(sal.subset)$which[2,]
+which.max(summary(sal.subset)$adjr2)
+```
+
+El mejor modelo lineal sin interaccion considerando dos variables es el que involucra **rank y discipline**
+
+```{r e2_3_ModeloMejorDosVarInteracc, echo=TRUE, collapse=TRUE}
+sal.lm2<-lm(salary~ rank+discipline, data=sal)
+summary(sal.lm2)
+sal.lm.int2<-lm(salary~rank*discipline, data=sal)
+summary(sal.lm.int2)
+```
+
+Observamos que r2ajustado empeoro cuando consideramos interaccion para realizar el modelo, por lo que **no deberiamos incluirla.**
+
+
+## 2.3 d) Ajustar el modelo completo.
+
+```{r e2_3_d_ModeloCompleto, echo=TRUE, collapse=TRUE}
+sal.lm.full<-lm(salary~., data=sal)
+summary(sal.lm.full)
+```
+
+## 2.3 e) Proponer un modelo y justificar que es mejor que el modelo completo.Realizar el análisis diagnóstico para este modelo.
+
+```{r e2_3_e_Propuesta_GraficoPredictores, echo=TRUE, collapse=TRUE}
+sal.subset.plot <- ggplot(
+  data = data.frame(n_predictores = 1:6, R_ajustado = summary(sal.subset)$adjr2),
+  mapping = aes(x = n_predictores, y = R_ajustado)) + 
+  geom_line() + 
+  geom_point() 
+
+# Se identifica en rojo el máximo 
+sal.subset.plot <- sal.subset.plot +
+  geom_point(aes(
+    x=n_predictores[which.max(summary(sal.subset)$adjr2)],
+    y=R_ajustado[which.max(summary(sal.subset)$adjr2)]), colour = "red", size = 3)
+
+sal.subset.plot <- sal.subset.plot +
+  scale_x_continuous(breaks = c(0:6)) + theme_bw() + 
+  labs(title = "R2_ajustado vs número de predictores", x = "número predictores") 
+
+sal.subset.plot
+
+```
+Si hubiesemos considerado 3 variables observamos que mejorariamos el r2aj. Por el criterio de parsimonia no seria necesario incluir 4 o 5 dado que no mejoraria notablemente esta metrica.
+
+```{r e2_3_ModeloTresVar, echo=TRUE, collapse=TRUE}
+sal.lm3<-lm(salary~ rank+discipline+sex, data=sal)
+summary(sal.lm3)
+```
+
+Consideramos un modelo con tres variables y observamos que no hay una mejoria tangible que justifique la inclusion de una variable mas. 
+
+# 2.4 Regresion Polinomica
+
+## **Ejercicio 2.4**. El conjunto de datos de Boston del paquete MASS recoge la mediana del valor de la vivienda en 506 áreas residenciales de Boston. Junto con el precio (medv), se han registrado 13 variables adicionales.
+
+> * crim: ratio de criminalidad per cápita de cada ciudad. zn: Proporción de zonas residenciales con edificaciones de más de 25.000 pies cuadrados.
+> * indus: proporción de zona industrializada.
+> * chas: Si hay río en la ciudad (= 1 si hay río; 0 no hay).
+> * nox: Concentración de óxidos de nitrógeno (partes per 10 millón).
+> * rm: promedio de habitaciones por vivienda.
+> * age: Proporción de viviendas ocupadas por el propietario construidas antes de 1940.
+> * dis: Media ponderada de la distancias a cinco centros de empleo de Boston.
+> * rad: Índice de accesibilidad a las autopistas radiales.
+> * tax: Tasa de impuesto a la propiedad en unidades de $10,000.
+> * ptratio: ratio de alumnos/profesor por ciudad.
+> * black: 1000(Bk − 0,63)2 donde Bk es la proporción de gente de color por ciudad.
+> * lstat: porcentaje de población en condición de pobreza.
+> * medv: Valor mediano de las casas ocupadas por el dueño en unidades de $1000s.
+
+```{r e2_4_Leer}
+  bos <- Boston
+  
+  mostrarDF(bos)
+```
+
+## 2.4 a) Utilizar una regresión polinómica de grado 2, otra de grado 5 y otra de grado 10 para estimar la variable medv en función de la variable lstat.
+```{r e2_4_a_ModelosBoston}
+
+bos.poly.lstat_1 <- lm(formula = medv ~ poly(lstat, 1), data = bos)
+summary(bos.poly.lstat_1)
+
+bos.poly.lstat_2 <- lm(formula = medv ~ poly(lstat, 2), data = bos)
+summary(bos.poly.lstat_2)
+
+bos.poly.lstat_5 <- lm(formula = medv ~ poly(lstat, 5), data = bos)
+summary(bos.poly.lstat_5)
+
+bos.poly.lstat_10 <- lm(formula = medv ~ poly(lstat, 10), data = bos)
+summary(bos.poly.lstat_10)
+
+```
+
+## 2.4 b) Comparar estos dos modelos utilizando el criterio de R2, son mejores que un modelo lineal simple?
+```{r e2_4_b_Comparacion}
+g <- rbind(glance(bos.poly.lstat_1),
+        glance(bos.poly.lstat_2),
+        glance(bos.poly.lstat_5),
+        glance(bos.poly.lstat_10)
+)
+nombres <- c('Lineal','Cuadratico','5ta','10ma')
+g <- cbind(nombres,round(g,3))
+
+mostrarDF(g)
+  
+```
+
+## 2.4 c) Estudie la incorporación de otra de las variables al modelo seleccionado.
+```{r e2_4_c_}
+  bos.lm.full <- lm(medv ~. , bos)
+  summary(bos.lm.full)
+  bos.mejmod <- regsubsets(medv ~ ., data = bos, nvmax = 13) 
+  summary(bos.mejmod)
+
+```
+```{r}
+bos.poly.2var <- lm(formula = medv ~ poly(lstat, 5)+ poly(rm, 5)+ poly(ptratio, 1)+poly(dis, 1), data = bos)
+summary(bos.poly.2var)
+```
+
+
+## **Ejercicio 2.5**. Con los datos_fifa que contienen 17907 registros correspondientes a 51 variables.
+
+> Se identifican dos variables numéricas de interés:
+> * Overall: Reputación y jerarquía internacional numérica del jugador.
+> * Valor: Sería el valor económico internacional de los jugadores
+
+```{r e2_5_Leer}
+
+```
+
+
+Definiendo como la variable predictora Overall y como variable respuesta
+Valor, se pide:
+
+## 2.5 a) Visualizar la relación entre ambas variables.
+```{r e2_5_a_}
+
+```
+
+## 2.5 b) Ajustar un modelo lineal simple.
+```{r e2_5_b_}
+
+```
+
+## 2.5 c) Ajustar un modelo lineal polinómico (seleccionar el grado adecuado).
+```{r e2_5_c_}
+
+```
+
+## 2.5 d) Definir la métrica RMSE y evalauar sobre un conjunto de validación los modelos ajustados.
+```{r e2_5_d_}
+
+```
+
+## 2.5 e) Realizar el análisis diagnóstico en cada caso.
+```{r e2_5_e_}
+
+```
+
+# 2.5 Modelo robusto
+
+## **Ejercicio 2.6** La base de datos crime.xlsx, tiene 51 observaciones de las siguientes variables:
+
+> * state: vector de caracteres que representa al estado.
+> * violent: tasa de crímenes violentos por cada 100.000 habitantes.
+> * murder: variable numérica que indica la cantidad cada 100.000 habitantes de asesinatos.
+> * poverty: variable numérica que indica la proporción de habitantes que están por debajo del límite de pobreza.
+> * single: variable numérica que indica el porcentaje de familias que tiene un único padre a cargo de la misma. 
+> * metro variable numérica que indica la proporción de familias que habitan en áreas metropolitanas.
+> * white: porcentaje de población blanca.
+> * highschool: porcentaje de habitantes graduados de la escuela sencundaria.
+
+```{r e2_6_LeerCrimen}
+crimen<- read.csv('crime.csv', sep = ';')
+mostrarDF(crimen)
+
+```
+
+## 2.6 a) Ajustar un modelos de regresión OLS y realizar analítica y gráficamente un análisis diagnóstico examinando leverage y distancias de Cook.
+
+```{r e2_6_a_ModeloOLS}
+# crimen.subset= regsubsets(crime ~ ., data = crimen[,-c(1,2)], nvmax = 7, method="forward") 
+# summary(crimen.subset)
+crimen.lm.full<-lm(crime~., data=crimen[,-c(1,2)]) 
+crimen.mejmod<-ols_step_all_possible(crimen.lm.full)
+crimen.mejmod.df<-as.data.frame(crimen.mejmod)
+mostrarDF(crimen.mejmod.df,10)
+```
+Excluimos la variable estado porque es categorica
+
+```{r}
+crimen.final<-rbind(
+crimen.mejmod.df[which.min(crimen.mejmod.df$msep),],
+crimen.mejmod.df[which.max(crimen.mejmod.df$adjr),],
+crimen.mejmod.df[which.min(crimen.mejmod.df$aic),],
+crimen.mejmod.df[which.min(crimen.mejmod.df$cp),])
+crimen.final<-cbind(criterio=c("MSE", "R2AJ","AIC","CP"), crimen.final)
+mostrarDF(crimen.final)
+
+```
+El modelo que elegimos usando los criterios MSE, r2adj, AIC y cp es el que involuvcra pobreza, vivir en area metropolitana, tener un unico padre y cantidad de asesinatos.
+
+
+```{r}
+crimen.mejmod.lm<- lm(crime~murder+pctmetro+poverty+single, data=crimen)
+summary(crimen.mejmod.lm)
+```
+Observamos que poverty no es significativa por lo que probamos un modelo con tres variables
+
+```{r}
+crimen.mejmod2.lm<- lm(crime~murder+pctmetro+single, data=crimen)
+summary(crimen.mejmod2.lm)
+```
+
+Con este modelo todas las variables son significativas, el modelo tambien es significativo, el r2ajustado es muy similar en ambos modelos evaluados. Elegimos el modelo que contiene 3 variables por el criterio de parsimonia.
+
+
+```{r e2_6_a_ModeloOLS_Test, collapse=TRUE}
+
+par(mfrow=c(2,2))
+plot(crimen.mejmod2.lm)
+
+shapiro.test(crimen.mejmod2.lm$residuals)
+
+bptest(crimen.mejmod2.lm)
+dwt(crimen.mejmod2.lm)
+
+```
+> ### Resultados
+>
+> **Normalidad:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. Los residuos tienen distribucion normal
+>
+> **Homocedasticidad:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. Los residuos son homocedasticos
+>
+> **Independencia:** el p-valor es mayor a 0.05, no se rechaza la hipotesis nula. Los residuos son no autocorrelacionados.
+
+## 2.6 b) Identificar las observaciones influyentes (recordar que 4/n es un valor de corte muy utilizado para las distancias de Cook). Ajustar un modelo OLS sin esas observaciones. Comparar los coeficientes estimados en ambos modelos.
+
+```{r e2_6_b_PuntosInfluyentes}
+#influenceIndexPlot(crim.lm, vars='cook', las=1, col='blue')
+crim.cook<-cooks.distance(crimen.mejmod2.lm)
+crim.cook[crim.cook>4/(nrow(crimen))]
+
+crim.infl <- which(crim.cook>4/(nrow(crimen)))
+
+```
+Encontramos que las observaciones 9, 25, 32 y 51 son influyentes
+
+
+
+```{r e2_6_b_ModeloSinInfluyentes_Test, collapse=TRUE}
+crimen.mejmod3.lm<- lm(crime~murder+pctmetro+single, data=crimen[-crim.infl,])
+summary(crimen.mejmod3.lm)
+
+par(mfrow=c(2,2))
+plot(crimen.mejmod3.lm)
+
+shapiro.test(crimen.mejmod3.lm$residuals)
+bptest(crimen.mejmod3.lm)
+dwt(crimen.mejmod3.lm)
+```
+
+
+
+```{r}
+coef(crimen.mejmod2.lm)
+coef(crimen.mejmod3.lm)
+
+```
+Observamos que al realizar el modelo con y sin valores influyentes cambia notablemente la pendiente y el intercepto.
+
+## 2.6 c) Generar una nueva variable con el valor absoluto de los residuos y señalar los diez residuos más altos. Coinciden con los valores influyentes?
+
+```{r e2_6_c_}
+crimen.residuos<-sort(abs(crimen.mejmod2.lm$residuals), decreasing=TRUE)
+crimen.residuos<-crimen.residuos[1:10]
+crimen.residuos
+```
+> **Influyentes**: 9, 25, 32, 51
+>
+> **Outliers e influyentes**: 9, 25 y 32
+>
+> Vemos que hay 3 observaciones en comun.
+
+## 2.6 d) Ajustar un modelo de regresión robusta mediante mínimos cuadrados ponderados iterados (IRLS). El comando para ejecutar una regresión robusta está rlm en (library MASS). Se pueden utilizar varias funciones de ponderación en IRLS uar en primera instancia los pesos de Huber.
+
+```{r e2_6_d_}
+crimen.rlm<- rlm(crime~murder+pctmetro+single, psi=psi.huber, data=crimen)
+summary(crimen.rlm)
+
+coef(crimen.mejmod2.lm)
+coef(crimen.rlm)
+```
+Comparando el modelo con tres variables y el modelo robusto con las mismas variables observamos que el error estandar de ambos modelos es muy similar, 152 y 160 respectivamente. Tambien vemos que los coeficientes son muy similares.
+Creemos que esto es razonable dado que el modelo original ya cumplia con los tres supuestos, por lo que el modelo robusto no deberia implicar un cambio sustancial.
+
+
+## 2.6 e) Hacerlo ahora con los pesos de la función bicuadrada ( psi = psi.bisquare). Nota: para aquellos que quieran profundizar en modelos robustos: La regresión robusta no aborda los problemas de heterogeneidad de la varianza para solucionar este problema se puede utilizar la librería sandwich.
+
+```{r e2_6_e_}
+crimen.rlm2<- rlm(crime~murder+pctmetro+single, psi=psi.bisquare, data=crimen)
+summary(crimen.rlm2)
+
+coef(crimen.mejmod2.lm)
+coef(crimen.rlm2)
+```
+
+# 2.6. Regresión Cuantiles
+
+## **Ejercicio 2.7** En la base de datos USgirl de la biblioteca Brq de R, se encuentran 500 registros correspondientes a edad y peso de mujeres de Estados Unidos.
+```{r e2_7_Leer}
+
+```
+
+Se pide:
+
+## 2.7 a) Graficar los pesos versus las edades. Qué se puede apreciar en este diagrama de dispersión?
+```{r e2_7_a_}
+
+```
+
+## 2.7 b) Ajustar un modelo para la mediana y graficar.
+```{r e2_7_b_}
+
+```
+
+## 2.7 c) Ajustar un modelo para los cuartiles y graficar.
+```{r e2_7_c_}
+
+```
+
+## 2.7 d) Ajustar un modelo para los deciles y graficar.
+```{r e2_7_d_}
+
+```
+
+
+
+
