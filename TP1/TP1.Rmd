@@ -728,6 +728,12 @@ La hipotesis nula de este test es que los residuos están normalmente distribuid
 
 **Independencia de los residuos**
 
+
+```{r}
+dwtest(model16_ww)
+```
+
+
 <span style="color: red;">Como se hace esto para modelos ponderados</span>
 
 **Homocedasticidad**

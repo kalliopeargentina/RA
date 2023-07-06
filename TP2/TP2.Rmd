@@ -27,11 +27,14 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(readxl)
+library(broom)
 library(MVN)
 library(gridExtra)
 library(lmtest)
 library(car)
 library(olsrr)
+library(stats)
+library(leaps)
 ```
 
 # 2.1. Modelo Aditivo 
@@ -531,7 +534,7 @@ Periódico falla el test de Wald, no es una variable significativa
 lm.fit1 <- lm(ventas ~ . , data = pub22[,-1])
 k <- ols_step_all_possible(lm.fit1)
 data.frame(k$predictors,k$adjr,k$cp,k$aic)
-plot(k)
+#plot(k)
 ```
 
 Otra forma con leaps:
@@ -549,8 +552,665 @@ coef(regfit.todos,2)
 
 ### d) Grafique para el modelo seleccionado el plano de ajuste y evalue si le parece adecuado.
 
+```{r}
+rango_tv <- range(pub22$tv)
+rango_radio <- range(pub22$radio) 
+
+nuevos_valores_tv <- seq(from = rango_tv[1], to = rango_tv[2], length.out = 20) 
+nuevos_valores_radio <- seq(from = rango_radio[1], to = rango_radio[2], length.out = 20)
+model22_tv_ra <- lm(ventas ~ radio + tv , data = pub22)
+g<-function(tv, radio) 
+   {predict(object = model22_tv_ra, newdata = data.frame(tv, radio)) }
+
+predicciones <- outer(
+  X= nuevos_valores_tv, 
+  Y = nuevos_valores_radio, 
+  FUN = g)
+
+superficie <- persp(x = nuevos_valores_tv, y = nuevos_valores_radio, z = predicciones, theta = 18, phi = 20, col = "lightblue", shade = 0.1, xlab = "tv", ylab = "radio", zlab = "ventas", ticktype = "detailed", main = "Prediccion ventas en funcion de tv y radio")
+
+observaciones <- trans3d(pub22$tv, pub22$radio, pub22$ventas, superficie) 
+error <- trans3d(pub22$tv, pub22$radio, fitted(model22_tv_ra), superficie) 
+points(observaciones, col = "red", pch = 16)
+segments(observaciones$x, observaciones$y, error$x, error$y)
+
+```
 
 ### e) Considere el mejor modelo pero ahora con interacción. Compare los modelos con y sin interacción.
+
+
+```{r}
+model22_tvxradio<-lm(ventas~ tv*radio, pub22)
+summary(model22_tvxradio)
+```
+```{r}
+glance(model22_tvxradio)
+```
+Mejor r cuadrado ajustado y AIC
+
+```{r}
+ols_mallows_cp(model22_tv_ra,model22_multi)
+```
+NO ENTIENDO COMO APLICA ESTO
+
+# 2.3.Regresoras Categóricas 
+
+## Ejercicio2.3. Con la base de datos Salaries con 397 registrosde 6 variables de la biblioteca carData de R.  
+
++ rank factor con tres niveles:AssocProf, AsstProf y Prof. 
++ discipline factor con dos niveles A( departamentos teóricos) o B(departamentos aplicados). 
++ yrs.since.phd años transcurridos desde el doctorado. 
++ yrs.service años de servicio. 
++ sex factor con dos niveles Femenino y Masculino. 
++ salary salario por nueve meses en dólares. 
+
+### a) Ajustar un modelo lineal para estimar el salario en función del sexo. 
+
+```{r}
+model23_sx <- lm(salary ~ sex, data=Salaries)
+summary(model23_sx)
+```
+```{r}
+sal23_sx_relevel <- Salaries %>%mutate(sex=relevel(sex, ref="Male"))
+model23_sx_relevel <- lm(salary ~ sex, data=sal23_sx_relevel)
+summary(model23_sx_relevel)
+```
+
+### b) Ajustar un modelo lineal para estimar el salario en función de los años de servicio. 
+```{r}
+model23_sx_ra <- lm(salary ~ rank, data=Salaries)
+summary(model23_sx_ra)
+```
+```{r}
+contrasts(Salaries$rank)
+```
+
+### c) Encontrar el modelo lineal que produzca el mejor ajuste con dos variables. Es necesario considerar interacción? 
+
+```{r}
+model23_sx_ra <- lm(salary ~ rank + sex, data=Salaries)
+summary(model23_sx_ra)
+```
+
+```{r}
+model23_sx_ra <- lm(salary ~ rank*sex, data=Salaries)
+summary(model23_sx_ra)
+```
+
+El modelo con interacción explica una proporción menor de los datos (r-cuadrado-ajustado) y denota colinealidad debido a que los coeficientes tienen p-valor altos en los test de Wald, sin embargo el modelo tiene un p-valor bajo en general. Conclusión: no conviene considerar la interacción.
+
+
+### d) Ajustar el modelo completo.
+
+```{r}
+model23_full <- lm(formula = salary ~ ., data = Salaries)
+summary(model23_full)
+```
+
+El modelo explica una mayor proporción de datos de acuerdo al R cuadrado ajustado (45% aprox) y, salvo por la variable sexMale que no es significativa, todo el resto lo son.
+
+
+### e) Proponer un modelo y justificar que es mejor que el modelo completo. Realizar el análisis diagnóstico para este modelo.
+
+```{r}
+```
+Tomando en consideración lo visto en el punto anterior, eliminamos la variable sex.
+
+```{r}
+models23 <- lm(salary ~ . , data = Salaries)
+k <- ols_step_all_possible(models23)
+df <- data.frame(k$predictors,k$adjr,k$cp,k$aic,k$sbic)
+df[order(df$k.adjr,decreasing=TRUE),]
+#plot(k)
+```
+
+```{r}
+which.max(k$adjr)
+which.min(k$cp)
+which.min(k$aic)
+which.min(k$sbic)
+```
+
+```{r}
+k[c(31,26),]
+```
+Se minimiza el AIC, BIC, y Mallows cp y se maximiza el R-cuadrado ajustado. Salen dos candidatos, siendo el 31 el que mas explica, pero la diferencia es muy poca con el modelo 26 y este último tiene menos variables. Elijo este por criterio de parsimonia.
+
+```{r}
+model23_final <- lm(salary ~ rank + discipline + yrs.since.phd + yrs.service,data=Salaries)
+summary(model23_final)
+```
+
+Lo primero que onserbamos es que explica el 44.55% de los datos que es casi la mitad. Lo siguiente que vemos es que en general el p-valor es bajo por lo cual el modelo es significativo en general. Tambnien notamos que los p-valores de los test de Wald de cada coeficiente también lo son, por lo tanto todos los coeficientes lo son.
+
+
+```{r e2_3_e_Propuesta_GraficoPredictores, echo=TRUE, collapse=TRUE}
+sal.subset <- regsubsets(salary ~ ., data = Salaries, nvmax = 10) 
+sal.subset.plot <- ggplot(
+  data = data.frame(n_predictores = 1:6, R_ajustado = summary(sal.subset)$adjr2),
+  mapping = aes(x = n_predictores, y = R_ajustado)) + 
+  geom_line() + 
+  geom_point() 
+
+# Se identifica en rojo el máximo 
+sal.subset.plot <- sal.subset.plot +
+  geom_point(aes(
+    x=n_predictores[which.max(summary(sal.subset)$adjr2)],
+    y=R_ajustado[which.max(summary(sal.subset)$adjr2)]), colour = "red", size = 3)
+
+sal.subset.plot <- sal.subset.plot +
+  scale_x_continuous(breaks = c(0:6)) + theme_bw() + 
+  labs(title = "R2_ajustado vs número de predictores", x = "número predictores") 
+
+sal.subset.plot
+
+```
+En este gráfico se ve también que hay una ganancia entre 5 y 4 variables en el r cuadrado ajustado, pero esto nos permite ver que la distancia entre el tercer modelo de tres variables y el de 4 es mucho mas chica, ppor lo cual podemos analizar mejor que solo tomando los optimos. En este caso probamos el de tres variables:
+
+```{r}
+model23_final_bis <- lm(salary ~ rank + discipline + sex,data=Salaries)
+summary(model23_final_bis)
+```
+Este modelo es bueno, pero vemos que el coeficiente sexMale no es signiificativo:
+
+```{r}
+model23_final_bis2 <- lm(salary ~ rank + discipline,data=Salaries)
+summary(model23_final_bis2)
+```
+
+En este modelo tenemos un r cuadrado menor, pero todos los coeficientes son significativos y encima usamos menos variables aun. Si lo vemos en orden de optimos es el cuarto, me quedo con este modelo en principio porque tiene todos los coeficientes significativos y menos variables. Por parsimonia también es mejor y la interpretación sería más sencilla.
+
+
+** Diagnóstico ** 
+
+```{r}
+shapiro.test(model23_final$residuals)
+shapiro.test(model23_final_bis$residuals)
+shapiro.test(model23_final_bis2$residuals)
+```
+No rechaza hipótesis de normalidad. Los residuos son normales en todos los modelos analizados.
+
+```{r}
+dwtest(model23_final,alternative ="two.sided",iterations=1000)
+dwtest(model23_final_bis,alternative ="two.sided",iterations=1000)
+dwtest(model23_final_bis2,alternative ="two.sided",iterations=1000)
+```
+No rechaza hipótesis de autocorrelación nula y hay normalidad en los residuos. Los residuos son independientes.
+
+```{r}
+bptest(model23_final)
+bptest(model23_final_bis)
+bptest(model23_final_bis2)
+```
+Pero en todos los casos no hay hocedasticidad ya que se rechaza la hipótesis nula.
+
+Entonces tratemos de aplicar Box y Cox al modelo elegido:
+
+```{r}
+box_cox_result <-boxcox(salary ~ rank + discipline,data=Salaries)
+best_box_cox <- box_cox_result$x[which.max(box_cox_result$y)]
+model23_final_bis2_bc <- lm((salary)^(best_box_cox) ~ rank + discipline, data = Salaries)
+summary(model23_final_bis2_bc)
+```
+
+** Diagnostico **
+
+```{r}
+shapiro.test(model23_final_bis2_bc$residuals)
+dwtest(model23_final_bis2_bc,alternative ="two.sided",iterations=1000)
+bptest(model23_final_bis2_bc)
+```
+Ahora cumple con normalidad y homocedasticidad pero no independencia y explica mejor, un 55%.
+
+Pero veamos los outliers tambien:
+
+```{r}
+outlierTest(model23_final_bis2)
+```
+```{r}
+summary(influence.measures(model = model23_final_bis2))
+```
+```{r}
+par(mfrow=c(2,2))
+plot(model23_final_bis2)
+par(mfrow=c(1,1))
+```
+
+```{r}
+
+influenceIndexPlot(model23_final_bis2, vars='Bonf', las=1,col='green')
+```
+Parece que hay algunos puntos de influencia y outliers, pero el 44 parece ser el más significativo. Probemos el modelo sin ese outlier en vez del 44.
+
+
+```{r}
+model23_final_bis3 <- lm(salary ~ rank + discipline,data=Salaries[,-c(44)])
+summary(model23_final_bis2)
+```
+No mejora el R cuadrado por lo pronto así que me quedo con el de Box y Cox.
+
+# 2.4. Regresión Po linómica
+
+## Ejercicio2.4.  El conjunto de datos de Boston del paquete MASS recoge la mediana del valor de la vivienda en 506 áreas residenciales de Boston. Junto con  el precio (medv), se han registrado 13 variables adicionales.
+
+> * crim: ratio de criminalidad per cápita de cada ciudad. zn: Proporción de zonas residenciales con edificaciones de más de 25.000 pies cuadrados.
+> * indus: proporción de zona industrializada.
+> * chas: Si hay río en la ciudad (= 1 si hay río; 0 no hay).
+> * nox: Concentración de óxidos de nitrógeno (partes per 10 millón).
+> * rm: promedio de habitaciones por vivienda.
+> * age: Proporción de viviendas ocupadas por el propietario construidas antes de 1940.
+> * dis: Media ponderada de la distancias a cinco centros de empleo de Boston.
+> * rad: Índice de accesibilidad a las autopistas radiales.
+> * tax: Tasa de impuesto a la propiedad en unidades de $10,000.
+> * ptratio: ratio de alumnos/profesor por ciudad.
+> * black: 1000(Bk − 0,63)2 donde Bk es la proporción de gente de color por ciudad.
+> * lstat: porcentaje de población en condición de pobreza.
+> * medv: Valor mediano de las casas ocupadas por el dueño en unidades de $1000s.
+
+### a) Utilizar una regresión polinómica de grado2, otra de grado 5 y otra de grado10 para estimar la variable medv en función de la variable lstat. 
+```{r}
+modelo24_2 <- lm(medv ~ poly(lstat, 2), data = Boston)
+modelo24_5 <- lm(medv ~ poly(lstat, 5), data = Boston)
+modelo24_10 <- lm(medv ~ poly(lstat, 10), data = Boston)
+summary(modelo24_2)
+summary(modelo24_5)
+summary(modelo24_10)
+```
+
+Las 3 regresiones son significativas.
+
+### b) Comparar estos dos modelos utilizando el criterio de R2, son mejores que un modelo lineal simple? 
+
+El que mejor performa en R2aj es el de grado 10, pero no es mucho mejor y vemos que a partir del grado 5 el resto de los coeficientes tienen p-valores que los hacen no significativos. Eso puede implicar que hay colinealidad entre las variables.
+
+Igual vamos a compararlos con ANOVA (modelos anidados):
+
+```{r}
+
+anova(modelo24_2,modelo24_5, modelo24_10)
+
+```
+Acá se puede ver que el p-valor del modelo con 10 no essignificativo respecto al de 5.Por lo cual no convendría elegirlo.
+
+```{r}
+plot(x = Boston$lstat, y = Boston$medv, main = "medv vs lstat", pch = 20, col = "grey30")
+points(Boston$lstat, fitted(modelo24_2), col = 'red', pch = 20)
+```
+
+```{r}
+plot(x = Boston$lstat, y = Boston$medv, main = "medv vs lstat", pch = 20, col = "grey30")
+points(Boston$lstat, fitted(modelo24_5), col = 'red', pch = 20)
+```
+
+```{r}
+plot(x = Boston$lstat, y = Boston$medv, main = "medv vs lstat", pch = 20, col = "grey30")
+points(Boston$lstat, fitted(modelo24_10), col = 'red', pch = 20)
+```
+
+### c) Estudie la incorporación de otra de las variables al modelo seleccionado.
+
+La estrategia a utilizar va aser agregar variables manualmente y comparar la performance de cada una y ver si mejora el r^2 y los coeficientes son significativos. Similar a lo que seria el Forwar step y en función del resultado se ve que variables hay que sacar si pierden significatividad. 
+
+```{r}
+
+modelo24_5_plus <- lm(medv ~ poly(lstat, 5)+crim + chas + rm + dis  + ptratio + black, data = Boston)
+summary(modelo24_5_plus)
+```
+Con ese proceso se mejoró el R2 y se descartaron tax y age porque a medida que fuimos agregando perdían significatividad. 
+Podría ahora seguir y hacer polinomiales las otras variables:
+  
+```{r}
+modelo24_5_plus_poly <- lm(medv ~ poly(lstat, 5)+ crim + chas + poly(rm,2) + dis  + ptratio + black, data = Boston)
+summary(modelo24_5_plus_poly)
+```
+```{r}
+plot(x = Boston$lstat, y = Boston$medv, main = "medv vs lstat", pch = 20, col = "grey30")
+points(Boston$lstat, fitted(modelo24_5_plus_poly), col = 'red', pch = 20)
+```
+Ahora me pregunto como medir el overfitting de esto, habría que hacer un train/test y verlo
+
+```{r}
+#make this example reproducible
+set.seed(1)
+df <- Boston
+#use 70% of dataset as training set and 30% as test set
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(0.7,0.3))
+train  <- df[sample, ]
+test   <- df[!sample, ]
+modelo24_5_plus_poly_tt <- lm(medv ~ poly(lstat, 5)+ crim + chas + poly(rm,2) + dis  + ptratio + black, data = train)
+summary(modelo24_5_plus_poly_tt)
+
+```
+```{r}
+pred24 <- predict(modelo24_5_plus_poly_tt,test)
+modelo24_5_plus_tt <- lm(medv ~ poly(lstat, 5), data = train)
+pred24_simple <- predict(modelo24_5_plus_tt,test)
+modelo24_5 <- lm(medv ~ poly(lstat, 5)+ crim + chas + rm + dis  + ptratio + black, data = train)
+pred24_simple_plus <- predict(modelo24_5,test)
+mean((pred24-test$medv)^2)
+mean((pred24_simple_plus-test$medv)^2)
+mean((pred24_simple-test$medv)^2)
+```
+
+La diferencia de errores cuadrados es mas chica con este último modelo. Pareciera ser mejor fit.
+
+
+## **Ejercicio 2.5**. Con los datos_fifa que contienen 17907 registros correspondientes a 51 variables.
+
+> Se identifican dos variables numéricas de interés:
+> * Overall: Reputación y jerarquía internacional numérica del jugador.
+> * Valor: Sería el valor económico internacional de los jugadores
+
+```{r e2_5_Leer}
+
+fifa25 <- read.csv('datos_fifa.csv')
+```
+
+
+Definiendo como la variable predictora Overall y como variable respuesta
+Valor, se pide:
+
+## 2.5 a) Visualizar la relación entre ambas variables.
+```{r e2_5_a_}
+ggplot(fifa25, aes(Overall, Valor)) + 
+  geom_point() + theme_minimal()
+```
+
+## 2.5 b) Ajustar un modelo lineal simple.
+```{r e2_5_b_}
+#make this example reproducible
+set.seed(1)
+df <- fifa25
+#use 70% of dataset as training set and 30% as test set
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(0.7,0.3))
+train  <- df[sample, ]
+test   <- df[!sample, ]
+model25_ln <- lm(Valor ~ Overall, data=train)
+summary(model25_ln)
+```
+
+## 2.5 c) Ajustar un modelo lineal polinómico (seleccionar el grado adecuado).
+```{r e2_5_c_}
+
+
+model25_poly2 <- lm(Valor ~ poly(Overall,2), data=train)
+model25_poly3 <- lm(Valor ~ poly(Overall,3), data=train)
+model25_poly4 <- lm(Valor ~ poly(Overall,4), data=train)
+model25_poly5 <- lm(Valor ~ poly(Overall,5), data=train)
+model25_poly6 <- lm(Valor ~ poly(Overall,6), data=train)
+model25_poly7 <- lm(Valor ~ poly(Overall,7), data=train)
+model25_poly8 <- lm(Valor ~ poly(Overall,8), data=train)
+model25_poly9 <- lm(Valor ~ poly(Overall,9), data=train)
+model25_poly10 <- lm(Valor ~ poly(Overall,10), data=train)
+model25_poly11 <- lm(Valor ~ poly(Overall,11), data=train)
+model25_poly12 <- lm(Valor ~ poly(Overall,12), data=train)
+model25_poly13 <- lm(Valor ~ poly(Overall,13), data=train)
+model25_poly14 <- lm(Valor ~ poly(Overall,14), data=train)
+model25_poly15 <- lm(Valor ~ poly(Overall,15), data=train)
+model25_poly16 <- lm(Valor ~ poly(Overall,16), data=train)
+model25_poly17 <- lm(Valor ~ poly(Overall,17), data=train)
+model25_poly18 <- lm(Valor ~ poly(Overall,18), data=train)
+model25_poly19 <- lm(Valor ~ poly(Overall,19), data=train)
+model25_poly20 <- lm(Valor ~ poly(Overall,20), data=train)
+
+anova(model25_ln, model25_poly2, model25_poly3, model25_poly4, model25_poly5, model25_poly6, model25_poly7, model25_poly8, model25_poly9, model25_poly10, model25_poly11, model25_poly12, model25_poly13, model25_poly14, model25_poly15, model25_poly16, model25_poly17, model25_poly18, model25_poly19, model25_poly20)
+
+```
+
+## 2.5 d) Definir la métrica RMSE y evalauar sobre un conjunto de validación los modelos ajustados.
+```{r e2_5_d_}
+library(Metrics)
+pred25_ln <- predict(model25_ln,test)
+pred25_poly2 <- predict(model25_poly2,test)
+pred25_poly3 <- predict(model25_poly3,test)
+pred25_poly4 <- predict(model25_poly4,test)
+pred25_poly5 <- predict(model25_poly5,test)
+pred25_poly6 <- predict(model25_poly6,test)
+pred25_poly7 <- predict(model25_poly7,test)
+pred25_poly8 <- predict(model25_poly8,test)
+pred25_poly9 <- predict(model25_poly9,test)
+pred25_poly10 <- predict(model25_poly10,test)
+pred25_poly11 <- predict(model25_poly11,test)
+pred25_poly12 <- predict(model25_poly12,test)
+pred25_poly13 <- predict(model25_poly13,test)
+pred25_poly14 <- predict(model25_poly14,test)
+pred25_poly15 <- predict(model25_poly15,test)
+pred25_poly16 <- predict(model25_poly16,test)
+pred25_poly17 <- predict(model25_poly17,test)
+pred25_poly18 <- predict(model25_poly18,test)
+pred25_poly19 <- predict(model25_poly19,test)
+pred25_poly20 <- predict(model25_poly20,test)
+
+rmse2 <- function(pred,obs) {sqrt(mean((pred-obs)^2))}
+
+rmse2(pred25_ln,test$Valor)
+rmse2(pred25_poly2,test$Valor)
+rmse2(pred25_poly3,test$Valor)
+rmse2(pred25_poly4,test$Valor)
+rmse2(pred25_poly5,test$Valor)
+rmse2(pred25_poly6,test$Valor)
+rmse2(pred25_poly7,test$Valor)
+rmse2(pred25_poly8,test$Valor)
+rmse2(pred25_poly9,test$Valor)
+rmse2(pred25_poly10,test$Valor)
+rmse2(pred25_poly11,test$Valor)
+rmse2(pred25_poly12,test$Valor)
+rmse2(pred25_poly13,test$Valor)
+rmse2(pred25_poly14,test$Valor)
+rmse2(pred25_poly15,test$Valor)
+rmse2(pred25_poly16,test$Valor)
+rmse2(pred25_poly17,test$Valor)
+rmse2(pred25_poly18,test$Valor)
+rmse2(pred25_poly19,test$Valor)
+rmse2(pred25_poly20,test$Valor)
+```
+Tanto por anova como por RMSE elijo el grado 18
+
+## 2.5 e) Realizar el análisis diagnóstico en cada caso.
+```{r}
+model25_poly18_f <- lm(Valor ~ poly(Overall,18), data=fifa25)
+plot(x = fifa25$Overall, y = fifa25$Valor, main = "Valor vs Overall", pch = 20, col = "grey30")
+points(fifa25$Overall, fitted(model25_poly18_f), col = 'red', pch = 20)
+```
+
+** Diagnóstico **
+COmo se hace esto cuando no es lineal la relación?
+
+```{r}
+shapiro.test(model25_poly18_f$residuals[1:5000])
+```
+Se cumple normalidad
+```{r}
+bptest(model25_poly18_f)
+```
+Heterocedastico
+
+```{r}
+dwtest(model25_poly18_f,alternative ="two.sided",iterations=1000)
+```
+No son independientes. Y eso parece tener sentido con la gráfica
+
+```{r}
+par(mfrow=c(2,2))
+plot(model25_poly18_f)
+par(mfrow=c(1,1))
+```
+## **Ejercicio 2.6** La base de datos crime.xlsx, tiene 51 observaciones de las siguientes variables:
+
+> * state: vector de caracteres que representa al estado.
+> * violent: tasa de crímenes violentos por cada 100.000 habitantes.
+> * murder: variable numérica que indica la cantidad cada 100.000 habitantes de asesinatos.
+> * poverty: variable numérica que indica la proporción de habitantes que están por debajo del límite de pobreza.
+> * single: variable numérica que indica el porcentaje de familias que tiene un único padre a cargo de la misma. 
+> * metro variable numérica que indica la proporción de familias que habitan en áreas metropolitanas.
+> * white: porcentaje de población blanca.
+> * highschool: porcentaje de habitantes graduados de la escuela sencundaria.
+
+
+```{r e2_6_LeerCrimen}
+crimen26<- read.csv('crime.csv', sep = ';')
+crimen26[, 'state'] <- as.factor(crimen26[, 'state'])
+```
+## 2.6 a) Ajustar un modelos de regresión OLS y realizar analítica y gráficamente un análisis diagnóstico examinando leverage y distancias de Cook.
+
+Excluimos la variable estado porque hay un registro por estado y no aporta al modelo.
+
+```{r e2_6_a_ModeloOLS}
+model26_full <- lm(crime ~ .,data=crimen26[-c(1,2)])
+summary(model26_full)
+models26 <- ols_step_all_possible(model26_full)
+models26 <- as.data.frame(models26)
+models26_sum <- as.data.frame(models26[order(models26$adjr, decreasing = TRUE), ])[c("predictors","adjr","aic","cp","sbic")]
+which.max(models26_sum$adjr)
+which.min(models26_sum$aic)
+which.min(models26_sum$cp)
+models26_sum
+```
+Por todos los criterios el mas adecuado aparenta ser el modelo que involucra murder,pctmetro, poverty y single. Veamos el detalle del mismo.
+
+```{r}
+model26_ln <- lm(crime ~ murder + pctmetro +  poverty + single,data=crimen26)
+summary(model26_ln)
+```
+El tema es que poverty no es significativa, pero recien el cuarto modelo en performance es el que no tiene poverty aunque la diferencia es poca en adjr2. 
+
+```{r warning=FALSE}
+library(regclass)
+VIF(model26_ln)
+```
+Aca vemos cierta colinealidad en murder y single, pero no pasa 5 por lo tanto estamos seguros. Pero probemos usar poverty, que nos dio un coeficiente no significativo con interacción.
+
+
+```{r}
+model26_ln_int <- lm(crime ~ murder + pctmetro + single*poverty ,data=crimen26)
+summary(model26_ln_int)
+```
+Si pruebo el modelo con interaccion con la variable poverty, que no era significativa, logro mejores resultados en el adjr2. Probando entre las tres variables, mejora bastante con single. ¿El tema seria como evaluar todas las posibles combinaciones de interacción?¿hay algo que mirar para decir que conviene usar interacción? Si entiendo que debo dejar poverty porque incluyo la interacción.
+
+Para ver si hay interacción es buscar interacciones en el corplot y probar, despues verificar que no hay colinealidades. Tambien se puede hacer el scatterplot y ver si se agrupan de forma distinta en relación a una variable categórica.
+
+
+Pruebe varias combinaciones polinómicas y no mejoro el r2adj
+
+
+
+**Diagnóstico **
+
+```{r}
+shapiro.test(model26_ln_int$residuals)
+```
+No rechaza normalidad
+
+```{r}
+dwtest(model26_ln_int,alternative ="two.sided",iterations=1000)
+
+```
+No rechaza autocorrelación y como los residuos son normales, son independientes.
+
+```{r}
+bptest(model26_ln_int)
+```
+No rechaza homocedasticidad.
+
+ENTIENDO IGUAL QUE ACA DEBERIA CAMBIAR AL TEST DE LEVENE POR HABER VARIABLES CATEGÓRICAS
+
+
+
+
+Cumple con todos los supuestos
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(model26_ln_int)
+par(mfrow=c(1,1))
+```
+```{r}
+summary(influence.measures(model = model26_ln_int))
+```
+
+## 2.6 b) Identificar las observaciones influyentes (recordar que 4/n es un valor de corte muy utilizado para las distancias de Cook). Ajustar un modelo OLS sin esas observaciones. Comparar los coeficientes estimados en ambos modelos.
+
+```{r e2_6_b_PuntosInfluyentes}
+#influenceIndexPlot(crim.lm, vars='cook', las=1, col='blue')
+crim.cook<-cooks.distance(model26_ln_int)
+crim.cook[crim.cook>4/(nrow(crimen26))]
+crim.infl <- which(crim.cook>4/(nrow(crimen26)))
+
+```
+Sacamos estos puntos y probamos el modelo de nuevo
+
+```{r}
+model26_ln_int2 <- lm(crime ~ murder + pctmetro + single*poverty,data=crimen26[-c(9,25,32,49),])
+summary(model26_ln_int2)
+```
+Ahora sí me da mejor el modelo
+
+## 2.6 c) Generar una nueva variable con el valor absoluto de los residuos y señalar los diez residuos más altos. Coinciden con los valores influyentes?
+
+```{r e2_6_c_}
+abs_res26 <- sort(abs(model26_ln_int$residuals),decreasing=TRUE)
+abs_res26[1:10]
+```
+No coinciden exactamente en orden pero estan entre los datos....
+
+## 2.6 d) Ajustar un modelo de regresión robusta mediante mínimos cuadrados ponderados iterados (IRLS). El comando para ejecutar una regresión robusta está rlm en (library MASS). Se pueden utilizar varias funciones de ponderación en IRLS uar en primera instancia los pesos de Huber.
+
+```{r e2_6_d_}
+library(MASS)
+model26_ln_int_hb <- rlm(crime ~ murder + pctmetro + single*poverty,psi=psi.huber,data=crimen26)
+summary(model26_ln_int_hb)
+coef(model26_ln_int)
+coef(model26_ln_int2)
+coef(model26_ln_int_hb)
+```
+No se alejan mucho los modelos, pero hay diferencias. En particular el error estandar es menor, pero no es menor que sin los outliers
+
+## 2.6 e) Hacerlo ahora con los pesos de la función bicuadrada ( psi = psi.bisquare). Nota: para aquellos que quieran profundizar en modelos robustos: La regresión robusta no aborda los problemas de heterogeneidad de la varianza para solucionar este problema se puede utilizar la librería sandwich.
+
+```{r e2_6_e_}
+model26_ln_int_bi <- rlm(crime ~ murder + pctmetro + single*poverty ,psi=psi.bisquare,data=crimen26)
+summary(model26_ln_int_bi)
+coef(model26_ln_int)
+coef(model26_ln_int_hb)
+coef(model26_ln_int_bi)
+```
+Idem punto anterior, en este caso el error estandar no es mejor que con Huber, pero es mejor que el no robusto. El que tiene menor error estandar es el que no lleva el outlier.
+
+
+# 2.7. Regresión Cuantiles
+
+## **Ejercicio 2.7** En la base de datos USgirl de la biblioteca Brq de R, se encuentran 500 registros correspondientes a edad y peso de mujeres de Estados Unidos.
+```{r e2_7_Leer}
+
+```
+
+Se pide:
+
+## 2.7 a) Graficar los pesos versus las edades. Qué se puede apreciar en este diagrama de dispersión?
+```{r e2_7_a_}
+
+```
+
+## 2.7 b) Ajustar un modelo para la mediana y graficar.
+```{r e2_7_b_}
+
+```
+
+## 2.7 c) Ajustar un modelo para los cuartiles y graficar.
+```{r e2_7_c_}
+
+```
+
+## 2.7 d) Ajustar un modelo para los deciles y graficar.
+```{r e2_7_d_}
+
+```
+
+
+
+
+
 
 
 

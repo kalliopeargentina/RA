@@ -121,7 +121,7 @@ Observar que disminuye el error estándar residual en el último modelo.
 <br>
 ```{r, echo=TRUE}
 library(readxl)
-IMCinfantil<-read_excel("C:/Users/cecim/Documents/Ce/AID/DataSets/IMCinfantil.xlsx")
+IMCinfantil<-read_excel("IMCinfantil.xlsx")
 dim(IMCinfantil)#150 9
 
 head(IMCinfantil)
