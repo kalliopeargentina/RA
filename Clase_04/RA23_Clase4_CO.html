@@ -2744,23 +2744,17 @@ overflow-y: auto;
 border: 1px solid #ddd;
 border-radius: 4px;
 }
-.tabset-dropdown > .nav-tabs > li.active:before {
-content: "";
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+content: "\e259";
 font-family: 'Glyphicons Halflings';
 display: inline-block;
 padding: 10px;
 border-right: 1px solid #ddd;
 }
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-content: "";
-border: none;
-}
-.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-content: "";
+content: "\e258";
 font-family: 'Glyphicons Halflings';
-display: inline-block;
-padding: 10px;
-border-right: 1px solid #ddd;
+border: none;
 }
 .tabset-dropdown > .nav-tabs > li.active {
 display: block;
@@ -2929,8 +2923,9 @@ head(x)</code></pre>
 alpha=0.</p>
 <pre class="r"><code>#install.packages(&quot;glmnet&quot;)
 library(glmnet) </code></pre>
+<pre><code>## Warning: package &#39;glmnet&#39; was built under R version 4.3.1</code></pre>
 <pre><code>## Loading required package: Matrix</code></pre>
-<pre><code>## Loaded glmnet 4.1-4</code></pre>
+<pre><code>## Loaded glmnet 4.1-7</code></pre>
 <pre class="r"><code>modelos_ridge &lt;- glmnet(x = x, y = y, alpha = 0)
 
 plot(modelos_ridge, xvar = &quot;lambda&quot;, label = TRUE)</code></pre>
@@ -3046,6 +3041,7 @@ scale=TRUE. Indicando validation = CV, se emplea
 10-fold-cross-validation para identificar el número óptimo de
 componentes.</p>
 <pre class="r"><code>library(pls) </code></pre>
+<pre><code>## Warning: package &#39;pls&#39; was built under R version 4.3.1</code></pre>
 <pre><code>## 
 ## Attaching package: &#39;pls&#39;</code></pre>
 <pre><code>## The following object is masked from &#39;package:stats&#39;:
@@ -3138,6 +3134,7 @@ test_MSE_OLS</code></pre>
 validation</h3>
 <pre class="r"><code>require(leaps) </code></pre>
 <pre><code>## Loading required package: leaps</code></pre>
+<pre><code>## Warning: package &#39;leaps&#39; was built under R version 4.3.1</code></pre>
 <pre class="r"><code>require(ggplot2) </code></pre>
 <pre><code>## Loading required package: ggplot2</code></pre>
 <pre class="r"><code>set.seed(2)

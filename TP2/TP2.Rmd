@@ -257,7 +257,6 @@ Los residuos son heterocedasticos porque se rechaza la hipotesis nula de homoced
  No se cumplen los supuestos entonces primero aplico una transformación de Box y Cox para ver si se resuelve el problema
  
 ```{r}
-library(MASS)
 box_cox_result <-boxcox(Volume ~ Height, data = trees)
 best_box_cox <- box_cox_result$x[which.max(box_cox_result$y)]
 model21_vh_bc <- lm((Volume)^(best_box_cox) ~ Height, data = trees)
@@ -531,8 +530,8 @@ Periódico falla el test de Wald, no es una variable significativa
 ### c) Ajustar los modelos de a pares y quedarse con el que mejor explique la variable respuesta utilizando elcriterio de AIC, R2 y Cp_Mallows.
 
 ```{r}
-lm.fit1 <- lm(ventas ~ . , data = pub22[,-1])
-k <- ols_step_all_possible(lm.fit1)
+models21_all <- lm(ventas ~ . , data = pub22[,-1])
+k <- ols_step_all_possible(models21_all)
 data.frame(k$predictors,k$adjr,k$cp,k$aic)
 #plot(k)
 ```
@@ -1182,7 +1181,8 @@ Idem punto anterior, en este caso el error estandar no es mejor que con Huber, p
 
 ## **Ejercicio 2.7** En la base de datos USgirl de la biblioteca Brq de R, se encuentran 500 registros correspondientes a edad y peso de mujeres de Estados Unidos.
 ```{r e2_7_Leer}
-
+library(Brq)
+data(USgirl)
 ```
 
 Se pide:
@@ -1190,20 +1190,76 @@ Se pide:
 ## 2.7 a) Graficar los pesos versus las edades. Qué se puede apreciar en este diagrama de dispersión?
 ```{r e2_7_a_}
 
+promedios33 <- colMeans(USgirl)
+ggplot(USgirl, aes(Age, Weight)) + 
+  geom_point() +
+  geom_vline(xintercept=promedios33[1],linetype="dotted") + 
+  geom_hline(yintercept=promedios33[2],linetype="dotted") + 
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  theme_minimal()
+
+
 ```
+
+La varianza parece no ser homocedastica
+
+```{r}
+model33 <- lm(Weight ~ Age , data=USgirl)
+par(mfrow=c(2,2))
+plot(model33)
+par(mfrow=c(1,1))
+```
+Y se puede ver una forma cónical en el primer gráfico.
+
+```{r}
+bptest(model33)
+```
+La hipótesis nula del test de Breuch-Paga se ve refutada con un p-valor bajo. hay heterocedasticidad
+
 
 ## 2.7 b) Ajustar un modelo para la mediana y graficar.
 ```{r e2_7_b_}
+library(quantreg)
+median33 <- rq(USgirl$Age ~ USgirl$Weight,data=USgirl, tau=0.5)
+ggplot(USgirl, aes(Age, Weight)) + 
+  geom_point() +
+  geom_vline(xintercept=promedios33[1],linetype="dotted") + 
+  geom_hline(yintercept=promedios33[2],linetype="dotted") + 
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  geom_quantile(quantiles = 0.5,color="cyan") +
+  theme_minimal()
+
 
 ```
 
 ## 2.7 c) Ajustar un modelo para los cuartiles y graficar.
 ```{r e2_7_c_}
 
+ggplot(USgirl, aes(Age, Weight)) + 
+  geom_point() +
+  geom_vline(xintercept=promedios33[1],linetype="dotted") + 
+  geom_hline(yintercept=promedios33[2],linetype="dotted") + 
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  geom_quantile(quantiles = 0.25,color="violet") +
+  geom_quantile(quantiles = 0.5,color="cyan") +
+    geom_quantile(quantiles = 0.75,color="violet") +
+  theme_minimal()
+
+
+
 ```
 
 ## 2.7 d) Ajustar un modelo para los deciles y graficar.
 ```{r e2_7_d_}
+q10 <- seq(0.1, 0.90, by = 0.1)
+ggplot(USgirl, aes(Age, Weight)) + 
+  geom_point() +
+  geom_vline(xintercept=promedios33[1],linetype="dotted") + 
+  geom_hline(yintercept=promedios33[2],linetype="dotted") + 
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  geom_quantile(quantiles = q10,color="violet")
+  theme_minimal()
+
 
 ```
 

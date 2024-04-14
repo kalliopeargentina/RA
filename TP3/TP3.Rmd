@@ -1,5 +1,5 @@
 ---
-title: "TP3"
+title: "TP3 Modelos Alternativos"
 author: "Marcos Buccellato"
 date: '2023-07-05'
 output:
@@ -22,26 +22,339 @@ editor_options:
 always_allow_html: yes
 ---
 
-```{r setup, include=FALSE}
+```{r setup, warning=FALSE, cache=FALSE, message=FALSE, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(broom)
+library(MVN)
+library(gridExtra)
+library(lmtest)
+library(car)
+library(olsrr)
+library(stats)
+library(MPV)
+library(regclass)
 ```
 
-## R Markdown
+# 3.1 Seleccion de variables
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## **Ejercicio 3.1** Con los datos table.b3 de la librería MPV(Montgomery, D.C., Peck, E.A., and Vining, C.G. (2001)) de R donde se registran para 32 automóviles las siguientes variables: 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+> * y → Rendimiento en millas por galón
+> * x1 → Desplazamiento
+> * x2 → Potencia (pies-libras)
+> * x3 → Torque (pies-libras)
+> * x4 → Tasa de Compresión
+> * x5 → Relación del eje trasero
+> * x6 → Carburador (barriles)
+> * x7 → Número de velocidades de trasmisión
+> * x8 → Lontitud Total (pulgadas)
+> * x9 → Ancho (pulgadas)
+> * x10 → Peso (libras)
+> * x11 → Tipo de trasmisión (1=automática, 0=manual)
 
-```{r cars}
-summary(cars)
+
+## 3.1 (a) Ajustar el modelo saturado (que contiene a todas las variables dependientes).
+```{r}
+model31_full <- lm(y ~ ., data=table.b3)
+summary(model31_full)
+```
+Se nota que hay mucha colinearidad ya que el p-valor general del modelo es bajo, pero los p-valor de los test de wald de cada coeficiente no son significativos
+
+## 3.1 (b) Analizar a través del VIF la presencia de multicolinealidad.
+
+```{r}
+VIF(model31_full)
+```
+Todas mayores a 5 salvo x4
+
+## 3.1 (c) Realizar una selección de variables foward teniendo en cuenta el criterio de Akaike.
+
+```{r}
+models31_aics <- ols_step_forward_aic(model31_full)
+summary(models31_aics$model)
+```
+El modelo seleccionado usa las variables x3 y x1,
+
+## 3.1 (d) Escribir la expresión del modelo seleccionado. Realizar un análisis diagnóstico del mismo.
+
+```{r}
+model31_x31 <- lm(y ~ x1 + x2, data=table.b3)
+summary(model31_x31)
 ```
 
-## Including Plots
+A priori es poco significativo el coeficiente de x2.
 
-You can also embed plots, for example:
+```{r}
+shapiro.test(model31_x31$residuals)
+```
+No rechaza normalidad
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+dwtest(model31_x31,alternative ="two.sided",iterations=1000)
+```
+No rechaza autocorrelación y siendo normales los residuos, entonces son independientes
+
+```{r}
+dwtest(model31_x31)
+```
+No rechaza homocedasticidad.
+
+Cumple con los supuestos.
+
+## 3.1 (e) Realizar una selección backward teniendo en cuenta el criterio de R2 ajustado. Se selecciona el mismo modelo?
+
+```{r}
+models31_bk <- regsubsets(y ~ ., data = table.b3, method = "backward",nbest=1)
+seleccion<-summary(models31_bk)
+seleccion$adjr2
+```
+Mejor modelo es el tercer
+
+```{r}
+seleccion$which
+```
+Selecciona x5, x8 y x10. 
+
+## 3.1 (f) Utilizando la función ols_step_all_possible de la biblioteca olsrr creada por Hebbali (2020) obtener todas las regresiones posibles. Elegir un único modelo visualizando gráficamente los resultados y considerando los criterios BIC, AIC, CP y R2 adj .
+
+```{r}
+k <- ols_step_all_possible(model31_full)
+data.frame(k$predictors,k$adjr,k$cp,k$aic,k$sbic)
+```
+```{r}
+rbind(
+k[which.max(k$adjr),],
+k[which.min(k$cp),],
+k[which.min(k$aic),],
+k[which.min(k$sbic),])
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Elijo el 67 porque maximiza adjr2 y es el mismo para el criterio CP
+
+```{r warning=FALSE}
+plot(k)
+```
+
+
+
+## **Ejercicio 3.2** Con el conjunto de datos fat de la biblioteca faraway de R
+
+Se registran la edad, el peso, la altura y 10 mediciones de la circunferencia corporal de 252 hombres. El porcentaje de grasa corporal de cada hombre se estimó con precisión mediante una técnica de pesaje bajo el agua. Las variables de la base son:
+
+> * **brozek** porcentaje de masa grasa según Brozek
+> * **siri** porcentaje de masa grasa según Siri
+> * **density** densidad (gm/cm3)
+> * **age** edad (años)
+> * **weight** peso (lbs)
+> * **height** estatura (inches)
+> * **adipos** BMI = Peso/Estatura2 (kg/m2)
+> * **free** peso libre de grasa (Brozek)
+> * **neck** circunferencia del cuello (cm)
+> * **chest** circunferencia del pecho (cm)
+> * **abdom** circunferencia abdominal (cm)
+> * **hip** circunferencia de la cadera (cm)
+> * **thigh** circunferencia del muslo (cm)
+> * **knee** circunferencia de la rodilla (cm)
+> * **ankle** circunferencia del tobillo (cm)
+> * **biceps** circunferencia extendida del biceps (cm)
+> * **forearm** circunferencia del antebrazo (cm)
+> * **wrist** Circunferencia de la muñeca (cm)
+
+## a) Hallar el mejor modelo de regresión lineal con variable respuesta brozek utilizando entre 1 y 14 variables predictoras. Elegir el mejor considerando el criterio CP de Mallows y R2adj .
+
+```{r}
+library(faraway)
+model32_full <- lm(brozek ~.,data =fat)
+models32 <- ols_step_all_possible(model32_full, max_order = 14)
+data.frame(models32$predictors,models32$adjr,models32$cp,models32$aic,models32$sbic)
+```
+
+```{r}
+as.data.frame(rbind(
+models32[which.max(models32$adjr),],
+models32[which.min(models32$cp),]))[,c("predictors","adjr","cp")]
+```
+La diferencia en adj3 es muy chica y el segundo modelo, pese a rener adj3 mas chico, tiene mejor CP y menos variables. Es más fácil de interpretar y corre menos riesgo de overfit.
+
+
+## b) Repetir considerando ahora la minimización del Error Cuadrático Medio del modelo usando validación cruzada leave one out.
+
+```{r warning=FALSE}
+library(caret)
+set.seed(12345)
+
+subsets32 <-regsubsets(brozek~.,data=fat, nvmax=14)
+
+train32.lista<- sample(1:nrow(fat), size = 0.75*(nrow(fat)))
+train32<- fat[train32.lista, ]
+test32 <- fat[-train32.lista, ]
+
+x.train32<-model.matrix(brozek ~ ., data = train32) 
+y.train32<-train32$brozek
+x.test32 <- model.matrix(brozek ~ ., data = test32)
+y.test32 <- test32$brozek
+
+train_control <- trainControl(method = "LOOCV",)
+
+
+## Lo hago parecido al de waldo, karina y Carina, porque siguiendo la logica de ols y lo que esta en la clase practica el tiempo de ejecución se me hace infinicto. No termino de entender aca como proceder.Lamentablemente borre el codigo por error....cuack
+
+# res <- data.frame()
+# pred <- as.data.frame(matrix(nrow = 63, ncol = 14))
+# for(i in 14:2){
+#  cat('Modelo', i)
+#   predictores <- names(coef(subsets32, id=i))
+#   iter <- train(x.train32[,predictores], y.train32,
+#       method = "lm",
+#       trControl = train_control)
+#   res <- rbind(res, iter$results)
+#   pred[,i] <- predict(iter$finalModel,newdata=as.data.frame(x.test32))
+# }
+
+res <- data.frame()
+pred <- as.data.frame(matrix(nrow = 63, ncol = 14))
+for(i in 1:nrow(models32)){
+  predictores <- strsplit(models32[20,"predictors"]," ")[[1]]
+  iter <- train(x.train32[,predictores], y.train32,
+      method = "lm",
+      trControl = train_control)
+  res <- rbind(res, iter$results)
+  pred[,i] <- predict(iter$finalModel,newdata=as.data.frame(x.test32))
+  }
+
+```
+
+No me queda claro que esta dando, la cantidad de variables difere de lo anterior.
+
+## c) Inspeccionar gráficamente el MSE y decidir cuál es el mejor modelo. Interpretar los coeficientes del mismo.
+
+
+```{r}
+
+```
+
+
+## d) Coinciden las variables de los modelos elegidos con los diferentes criterios.
+
+
+# 3.2. Modelos de Regularización
+
+## **Ejercicio 3.3**  Con los datos macroeconómicos longley de la biblioteca lars de R, que presentan alta colinealidad vamos a ajustar modelos de regularización. La base tiene 16 registros de 7 variables económicas observadas entre 1947 y 1962.
+
+```{r}
+prostata33 <- read.csv('prostata.csv')
+```
+
+## a) Ajustar un modelo de Ridge para la variable respuesta Employed.
+
+
+
+## b) Ajustar un modelo de Lasso para la variable respuesta Employed.
+
+
+
+## c) Ajustar un modelo de Elastic Net para la variable respuesta Employed.
+
+
+
+## d) Comparar los resultados obtenidos en los tres modelos.
+
+
+## **Ejercicio 3.4**  Los datos prostata.xlsx disponibles en contiene 99 registros con una serie de medidas clínicas en hombres previas a una cirugía de próstata.
+>
+> * **volumen_pros** volumen prostático.
+> * **peso_pros** peso de la próstata.
+> * **edad** en años.
+> * **log_hiperp_benig** logaritmo de la hiperplasia benigna.
+> * **invade_vesic_semin** invasión de vesículas seminales.
+> * **penetrac_capsular** penetración capsular.
+> * **gleason** índice de Gleason.
+> * **porc_punt_gleas_45** proporción de puntuación 4 o 5.
+> * **log_psa** logaritmo del antígeno prostático.
+
+## a) Considerando la variable respuesta lpsa, ajustar un modelo lineal utilizando como predictoras a todas las demás. Qué inconveniente tiene este modelo?
+
+
+## b) Aplicar un método de selección de variables utilizando como criterio BIC. Qué variables quedaron? Coinciden con el OLS?.
+
+
+## c) Ajustar ahora modelos regularizados y comparar los resultados y coeficientes utilizando CV
+
+# 3.3. Modelos basados en PCA
+## **Ejercicio 3.5**  Los dos conjuntos de datos están relacionados con variantes rojas y blancas del vino portugués
+
+"Vinho Verde" [Cortez et al., 2009]. Debido a cuestiones de privacidad y logística, solo están disponibles variables fisicoquímicas (entradas) y sensoriales (salida). Las clases están ordenadas y no equilibradas (por ejemplo, hay muchos más vinos normales que excelentes o malos). Los algoritmos de detección de valores atípicos podrían usarse para detectar los pocos vinos excelentes o malos. Además, no estamos seguros de si todas las variables de entrada son relevantes. Por lo que podría ser interesante probar métodos de selección de variables.
+Las bases de datos son winequality-white y winequality-red disponibles en shorturl.at/krty9 y shorturl.at/eqy39.
+
+> ###Información de atributos:
+> * **acidez fija**
+> * **acidez volátil**
+> * **ácido cítrico**
+> * **azúcar residual**
+> * **cloruros**
+> * **anhídrido sulfuroso libre**
+> * **anhídrido sulfuroso total**
+> * **densidad**
+> * **pH**
+> * **sulfatos**
+> * **alcohol**
+> * **calidad** (puntuación con rango 0-10)
+
+```{r e3_5_}
+
+```
+
+Elija uno de los dos archivos y realice el siguiente análisis.
+
+## a) Realizar un correlograma para el conjunto de variables explicativas. Tiene sentido en este caso un PCA? En caso afirmativo explore las componentes principales.
+```{r e3_5_a_}
+
+```
+
+## b) Partir la base en train-test. Considerando la calidad como variable respuestas, ajustar un modelo de PCR.
+```{r e3_5_b_}
+
+```
+
+## c) Cuál es el número óptimo de componentes principales a considerar? Grafique las puntuaciones originales y las ajustadas por PCR.
+```{r e3_5_c_}
+
+```
+
+## d) Calcular el MSE para este subconjunto de componentes.
+```{r e3_5_d_}
+
+```
+
+## e) Realizar el ajuste en este caso con PLS. Comparar los resultados de ambos modelos.
+```{r e3_5_e_}
+
+```
+
+## f) (para hacer en la unidad de regresión logística) Clasifique a los vinos como regulares (calidad< 5) → 0, y buenos o muy buenos (calidad≥5) → 1. Ajuste un modelo de regresión logística para estimar la calidad del vino. Evalue la pertinencia del modelo.
+```{r e3_5_f_}
+
+```
+
+## **Ejercicio 3.6**  Usaremos los datos ChemicalManufacturingProcess de la biblioteca AppliedPredictiveModeling de R.
+```{r e3_6_}
+
+```
+
+Este conjunto de datos contiene información sobre un proceso de fabricación de productos químicos, en el que el objetivo es comprender la relación entre el proceso y el rendimiento del producto final resultante.
+La materia prima en este proceso se somete a una secuencia de 27 pasos para generar el producto farmacéutico final.
+El objetivo de este proyecto fue desarrollar un modelo para predecir el porcentaje de rendimiento del proceso de fabricación. El conjunto de datos consta de 177 muestras de material biológico para las que se midieron 57 características.
+Los predictores son continuos, de conteo, categóricos; algunos están correlacionados y otros contienen valores faltantes. Las muestras no son independientes porque los conjuntos de muestras provienen del mismo lote de material de partida biológico.
+
+## a) Realizar un análisis cuidadoso de las variables predictoras y una limpieza de la base.
+```{r e3_6_a_}
+
+```
+
+## b) Aplicar PCR y PLS para predecir Yield (rendimiento) y comparar los resultados de ambos métodos.
+```{r e3_a_b_}
+
+```

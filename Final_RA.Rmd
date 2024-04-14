@@ -1,0 +1,560 @@
+---
+title: "Exámen final Regresión Avanzada 2023"
+author: "Marcos Buccellato"
+date: '2023-07-18'
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    toc: yes
+    toc_depth: 5
+    number_sections: no
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+editor_options:
+  markdown:
+    wrap: 72
+always_allow_html: yes
+---
+
+
+```{r setup, warning=FALSE, cache=FALSE, message=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(broom)
+library(MVN)
+library(gridExtra)
+library(lmtest)
+library(car)
+library(olsrr)
+library(stats)
+library(MPV)
+library(regclass)
+library(MASS)
+```
+
+
+```{r warning=FALSE, cache=FALSE, message=FALSE}
+datos <- read.csv2('data_pancreas_resumen.csv',sep=";")
+datos[, 'sexo'] <- as.factor(datos[, 'sexo'])
+datos[, 'estadio'] <- as.factor(datos[, 'estadio'])
+datos[, 'diagnosis'] <- as.factor(datos[, 'diagnosis'])
+```
+
+```{r}
+library(splitstackshape)
+set.seed(24564066)
+strat_data <- stratified(datos, "diagnosis", 300/nrow(datos))
+```
+
+
+# Ejercicio 1
+
+## 1) Construya un modelo lineal simple para explicar el valor de la creatinina en función de alguna de las restantes variables numéricas y evalúe la bondad del ajuste.
+
+Probamos un modelo lineal muy sencillo
+
+```{r}
+model11_simple <- lm(creatinina ~ LYVE1,data=strat_data)
+summary(model11_simple)
+```
+El p-valor d del modelo general y el test de wald de la variable LYVE1 son menores a 0.05, por lo tanto el modelo es significativo. Sin embargo el R cuadrado indica que esta variable sólo explica el 12.45% de los datos, si bien es significativa, no es muy útil para explicar los datos.
+
+
+
+## 2) Realice un análisis diagnóstico y de puntos influyentes e indique si el modelo es adecuado.
+
+Vamos a testear las condiciones que un modelo lineal debe cumplir: 
+
+
+**Diagnóstico **
+
+```{r}
+shapiro.test(model11_simple$residuals)
+```
+Rechaza normalidad
+
+```{r}
+dwtest(model11_simple,alternative ="two.sided",iterations=1000)
+
+```
+Rechaza independencia
+
+```{r}
+bptest(model11_simple)
+```
+Rechaza homocedasticidad.
+
+El modelo no cumple con ninguno de los supuestos....
+
+
+** Puntos influyentes **
+
+
+```{r}
+model11_simple <- lm(creatinina ~ LYVE1, data = strat_data)
+promedios11 <- colMeans(strat_data[,6:7])
+ggplot(strat_data, aes(creatinina,LYVE1)) + 
+  geom_point() +
+  geom_vline(xintercept=promedios11[2],linetype="dotted") + 
+  geom_hline(yintercept=promedios11[1],linetype="dotted") +
+   geom_smooth(method = "lm", se = TRUE, color = "black") +
+  theme_minimal()
+```
+
+
+De este plot ya podemos ver que hay muchos puntos muy alejados de la recta, estos son candidatos a ser puntos influyentes. Es razonable que haya tantos puntos que no estan cercanos a la recta considerando que el r cuadrado es tan bajo
+
+```{r}
+par(mfrow=c(2,2))
+plot(model11_simple)
+par(mfrow=c(1,1))
+```
+
+
+
+```{r}
+summary(influence.measures(model = model11_simple))
+```
+
+Todos estos puntos son puntos influyentes según alguna de las métricas propiestas, por ejemplo el 188,221,272,287,291,295,203,319,323,326, y 361 los son en base a l inidicador de HAT.
+
+
+El modelo claramente no es adecuado por más que el p-valor del modelo sea bajo no cumple con ninguno de los supuestos (normalidad de los residuos, independcencia y homocedasticidad), el R cuadrado es muy bajo y, en ese contexto, podemos considerar que hay muchos puntos influyentes.
+
+
+## 3. Realice una transformación de la variable respuesta para intentar lograr normalidad en la distribución de los residuos. Indique si el modelo con esta transformación resulta adecuado.
+
+
+```{r}
+box_cox_result <-boxcox(creatinina ~ LYVE1, data = strat_data)
+best_box_cox <- box_cox_result$x[which.max(box_cox_result$y)]
+model11_box_cox <- lm((creatinina)^(best_box_cox) ~ LYVE1, data = strat_data)
+summary(model11_box_cox)
+```
+
+Realizo un ajuste box y cox y el p-valor del modelo sigue siendo satisfactirio pero el e cuadrado sigue siendo muy bajo.
+
+```{r}
+shapiro.test(model11_box_cox$residuals)
+```
+NO rechaza normalidad
+
+```{r}
+dwtest(model11_box_cox,alternative ="two.sided",iterations=1000)
+
+```
+NO Rechaza independencia
+
+```{r}
+bptest(model11_box_cox)
+```
+No rechaza homocedasticidad.
+
+Ahora el modelo si cumple con todos los supuestos que debe tener. Sin embargo el R cuadrado sigue siendo muy bajo. No es un buen modelo para explicar los datos.
+
+
+## 4. Sin considerar la variable estadío, ajuste un modelo multivariado robusto para explicar el valor de la creatinina y estime el error absoluto medio cometido.
+
+
+```{r}
+model11_robusto <- rlm(creatinina ~ edad + sexo + diagnosis  + LYVE1 + REG1B + TFF1,psi=psi.huber,data=strat_data)
+summary(model11_robusto)
+
+```
+```{r}
+
+mean(abs(strat_data$creatinina - predict(model11_robusto, newdata = strat_data)))
+library(Metrics)
+MAE_robust11 <- mae(strat_data$creatinina,predict(model11_robusto))
+MAE_robust11
+```
+Genero un modelo robusto y calculo el MAE con dos métodos. No se me pide interpretar nada
+
+
+##5. Sin considerar la variable estadío, utilice un método de selección de variables para proponer un nuevo modelo multivariado que explique el valor de la creatinina. Estudie el cumplimiento de los supuestos y haga una transformación en caso de ser necesario. Analice los coeficientes del modelo final.
+
+```{r}
+model11_multi <- lm(creatinina ~ edad + sexo + diagnosis  + LYVE1 + REG1B + TFF1,data=strat_data)
+model11_forward <- ols_step_forward_aic(model11_multi)
+summary(model11_forward$model)
+
+```
+El modelo seleccionado como el mejor por el método step forward es  el que usa las variables: TFF1, edad, LYVE1, sexo y diagnosis.
+
+Vemos que el p-valor de significación del modelo es menor a 0.05 por ,o cual el modelo es significativbo y también vemos que los test de wald de todas las variables son menores a 0.05 por lo tanto son significativas. Sin embargo el modelo tiene un R cuadrado ajustado muy bajo, de 28,4%.
+
+
+
+```{r}
+model11_multi_final <- lm(creatinina ~ edad + sexo + diagnosis  + LYVE1 + TFF1,data=strat_data)
+```
+
+
+** Diagnóstico **
+
+```{r}
+shapiro.test(model11_multi_final$residuals)
+```
+Rechaza normalidad
+
+```{r}
+dwtest(model11_multi_final,alternative ="two.sided",iterations=1000)
+
+```
+NO Rechaza independencia
+
+```{r}
+bptest(model11_multi_final)
+```
+Rechaza homocedasticidad
+
+No cumple con el supuesto de homocedasticidad ni normalidad de los residuos. Pruebo con box y cox
+
+
+```{r}
+box_cox_result_final <-boxcox(creatinina ~ edad + sexo + diagnosis  + LYVE1 + TFF1, data = strat_data)
+best_box_cox_final <- box_cox_result_final$x[which.max(box_cox_result_final$y)]
+model11_box_cox_final <- lm((creatinina)^(best_box_cox_final) ~ edad + sexo + diagnosis  + LYVE1 + TFF1, data = strat_data)
+summary(model11_box_cox_final)
+```
+
+El modelo sigue siendo significativo asi como todas sus variables, el R cuadrado ajustado sigue siendo bajo.
+
+** Diagnóstico ** 
+
+
+```{r}
+shapiro.test(model11_box_cox_final$residuals)
+```
+NO Rechaza normalidad
+
+```{r}
+dwtest(model11_box_cox_final,alternative ="two.sided",iterations=1000)
+
+```
+NO Rechaza independencia
+
+```{r}
+bptest(model11_box_cox_final)
+```
+No rechaza homocedasticidad. Es decir que si aplico una transformación de box y cox cumplo con los supuestos del modelo.
+
+El modelo nos indica que la cantidad de creatinina se ve afectada de forma importante para pacientes de sexo masculino con un diagnóstico "normal" y que disminuye con la edad. También se ve positivamente afectado por los valores de LYVE1 y TFF1.
+
+## 6) Estime los errores de predicción de los 4 modelos previos y compárelos. Cuál elegiría?
+
+Podemos usar cualquier indicador de error para la comparación, ya veniamos con MAE, podemos 
+
+```{r}
+MAE_simple11 <- mae(strat_data$creatinina,predict(model11_simple))
+MAE_simplebc11 <- mae(strat_data$creatinina,predict(model11_box_cox))
+MAE_robust11 <- mae(strat_data$creatinina,predict(model11_robusto))
+MAE_multibc11 <- mae(strat_data$creatinina,predict(model11_box_cox_final))
+MAE_simple11
+MAE_simplebc11
+MAE_robust11
+MAE_multibc11
+```
+Comparando los MAE de los cuatro modelos: simple, simple con box_cox, robusto, y multivariado con box y cox, el que tiene menor MAE es el modelo robusto. Este sería el que elegiria.
+
+
+## 7. Le parece adecuado un modelo GAMLSS en este caso? Justifique.
+
+
+
+# Ejercicio 2
+
+
+Estudie analítica y gráficamente si:
+## 1. existen diferencias estadísticamente significativas en las medias de los valores de creatinina respecto de la variable estadío.
+
+
+```{r}
+plot(strat_data$creatinina~strat_data$estadio)
+```
+Si miramos los boxplots de los gráficos podemos ver que las medianas de cada estadío son similares y las categorias parecen estar alineadas en los mismos valores.  Visualmente no parece haber mayores diferencias. Veamos analíticamente:
+
+```{r}
+AOV_estadio<- aov(strat_data$creatinina~strat_data$estadio)
+summary(AOV_estadio)
+```
+
+Vemos que el p-valor del test ANOVA da 0.0862 que es mayor a 0.05. Esto indica que no se rechaza la hipótesis nula de que las medias son iguales, sin embargo, HAY que verificar los supuesto de normalidad y homogeneidad de las varianzas primero para cconcluir algo. De cumplirse los mismos, podremos decir que no hay diferencia significativa entre las varianzas. 
+
+Analicemos la igualdad de las varianzas primero con el test de levene:
+
+```{r}
+leveneTest(strat_data$creatinina~strat_data$estadio)
+```
+No se rechaza la hipótesis nula que afirma que las varianzas son iguales, por lo tanto hay homogeneidad.
+
+Analicemos la normalidad:
+
+```{r}
+shapiro.test(residuals(AOV_estadio))
+```
+
+Sin embargo, no se cumple la normalidad de los residuos. Por lo cual un supuesto falla. Probemos con Kruskal Wallis.
+
+```{r}
+ggplot(data = strat_data, mapping = aes(x = creatinina, colour =estadio )) + 
+  geom_histogram() + theme_bw() + facet_grid(. ~ estadio) + 
+  theme(legend.position = "none")# 
+```
+Verificamos primero que las distribuciones sean similares. Graficamente validamos que los son.
+
+Aplicamos Kruskal-Wallis:
+
+
+```{r}
+
+kruskal.test(creatinina ~ estadio, data = strat_data)
+```
+
+Segun el resultado del test, dado que el p-valor es mayor a 0.05 no puedo conlcuir que haya diferencias en las medias de los diferentes estadíos.
+
+## 2. existen diferencias estadísticamente significativas en las medias de los valores de creatinina respecto de la variable estadío considerando sólo la base de pacientes enfermos.
+
+```{r}
+sick_people <- strat_data[strat_data$diagnosis!="normal"]
+plot(sick_people$creatinina~sick_people$estadio)
+```
+Filtamos los datos para aquellos que tienen diagnosticado un tumor maligno y volvemos hacer el analisis gráfico. Pareciera haber diferencias. 
+
+```{r}
+AOV_estadio_sick<- aov(sick_people$creatinina~sick_people$estadio)
+summary(AOV_estadio_sick)
+```
+Vemos que el p-valor del test ANOVA da 0.137 que es mayor a 0.05. Esto indica que no se rechaza la hipótesis nula de que las medias son iguales, sin embargo, nuevamente HAY que verificar los supuesto de normalidad y homogeneidad de las varianzas primero para cconcluir algo. De cumplirse los mismos, podremos decir que no hay diferencia significativa entre las varianzas. 
+
+
+```{r}
+leveneTest(sick_people$creatinina~sick_people$estadio)
+```
+No se rechaza la hipótesis nula que afirma que las varianzas son iguales, por lo tanto hay homogeneidad.
+
+Analicemos la normalidad:
+
+```{r}
+shapiro.test(residuals(AOV_estadio_sick))
+```
+Nuevamente se rechaza normalidad de los residuos
+
+
+Por lo cual un supuesto falla. Probemos con Kruskal Wallis.
+
+```{r}
+ggplot(data = sick_people, mapping = aes(x = creatinina, colour =estadio )) + 
+  geom_histogram() + theme_bw() + facet_grid(. ~ estadio) + 
+  theme(legend.position = "none")# 
+```
+Al igual que el caso anterior se cumple que las distribuciones son similares
+
+```{r}
+
+kruskal.test(creatinina ~ estadio, data = sick_people)
+```
+Y nuevamente no se rechaza que tengan la misma media.
+
+## 3. existen diferencias estadísticamente significativas en las medias de los valores de creatinina respecto del sexo.
+
+Bueno... esto más que una pregunta es una afirmación. Veamos:
+
+```{r}
+plot(strat_data$creatinina~strat_data$sexo)
+```
+MMmmm... dudoso... vamos a los números
+
+```{r}
+AOV_sexo<- aov(strat_data$creatinina~strat_data$sexo)
+summary(AOV_sexo)
+```
+
+Vemos que el p-valor del test ANOVA da 0.0128 que es memor a 0.05. Esto indica que se rechaza la hipótesis nula de que las medias son iguales, sin embargo, HAY que verificar los supuesto de normalidad y homogeneidad de las varianzas primero para cconcluir algo. De cumplirse los mismos, podremos decir que no hay diferencia significativa entre las varianzas. 
+
+Analicemos la igualdad de las varianzas primero con el test de levene:
+
+```{r}
+leveneTest(strat_data$creatinina~strat_data$sexo)
+```
+No se rechaza la hipótesis nula que afirma que las varianzas son iguales, por lo tanto hay homogeneidad.
+
+Analicemos la normalidad:
+
+```{r}
+shapiro.test(residuals(AOV_sexo))
+```
+uff. nuevamente se rechanzan la normalidad de los residuos....
+
+
+
+```{r}
+ggplot(data = strat_data, mapping = aes(x = creatinina, colour =sexo )) + 
+  geom_histogram() + theme_bw() + facet_grid(. ~ sexo) + 
+  theme(legend.position = "none")# 
+```
+las distribuciones son similares.
+
+```{r}
+kruskal.test(creatinina ~ sexo, data = strat_data)
+```
+En este caso el test de kruskal-wallis si nos indica que las medias pueden ser diferentes.
+
+## 4. la interacción entre estadío y sexo es significativa cuando se considera la base completa.
+
+
+```{r}
+model24_inter <- lm(creatinina ~  estadio*sexo,data=strat_data)
+summary(model24_inter)
+```
+Si bien el p-valor de generla del modelo está por debajo de 0.05, las variables y las interacciones, ninguna resulta significativa si miramos los test de wald de cada una de ellas.
+
+
+## 5. se satisfacen los supuestos del modelo en 1, 2 y 3. En caso negativo intente una transformación adecuada sobre la variable respuesta en cada modelo y revise nuevamente los supuestos.
+
+
+Ok, en ningún caso satisfizo todos los supuestos. Podemos probar aplicar box y cox en los tres casos. Obtengamos los lambda
+
+```{r}
+box_cox_1 <-boxcox(creatinina ~ estadio, data = strat_data)
+best_box_cox_1 <- box_cox_1$x[which.max(box_cox_1$y)]
+model25_1 <- lm((creatinina)^(best_box_cox_1) ~ estadio, data = strat_data)
+summary(model25_1)
+```
+
+```{r}
+box_cox_2 <-boxcox(creatinina ~ estadio, data = sick_people)
+best_box_cox_2 <- box_cox_2$x[which.max(box_cox_2$y)]
+model25_2 <- lm((creatinina)^(best_box_cox_2) ~ estadio, data = strat_data)
+summary(model25_2)
+```
+```{r}
+box_cox_3 <-boxcox(creatinina ~ sexo, data = strat_data)
+best_box_cox_3 <- box_cox_3$x[which.max(box_cox_3$y)]
+model25_3 <- lm((creatinina)^(best_box_cox_3) ~ sexo, data = strat_data)
+summary(model25_3)
+```
+** Modelo 1 **
+
+```{r}
+leveneTest(model25_1)
+```
+No se rechaza la hipótesis nula que afirma que las varianzas son iguales, por lo tanto hay homogeneidad.
+
+Analicemos la normalidad:
+
+```{r}
+shapiro.test(residuals(model25_1))
+```
+No se rechaza normalidad. Un lujo!
+
+** Modelo 2 **
+
+```{r}
+leveneTest(model25_2)
+```
+No se rechaza la hipótesis nula que afirma que las varianzas son iguales, por lo tanto hay homogeneidad.
+
+Analicemos la normalidad:
+
+```{r}
+shapiro.test(residuals(model25_2))
+```
+No se rechaza normalidad porque tomamos 0.01 (estuvo cerca...)
+** Modelo 3 **
+
+```{r}
+leveneTest(model25_3)
+```
+No se rechaza la hipótesis nula que afirma que las varianzas son iguales, por lo tanto hay homogeneidad.
+
+Analicemos la normalidad:
+
+```{r}
+shapiro.test(residuals(model25_3))
+```
+No se rechaza normalidad.
+
+Los modelos transformados cumplen con los supuestos.
+
+## 6. Obtenga conclusiones acerca de dónde se observan las diferencias si las hubiere.
+
+Como vimos en el punto 3 observamos diferencias entre las medias de cratinina entre los sexos.
+
+
+# Ejercicio 3
+
+## 1. Ajuste un modelo logístico para predecir el diagnóstico de cáncer de páncreas en función de las variables en la base que considere razonables.
+
+
+```{r}
+modelo_logistico <- glm(diagnosis ~ sexo+edad+LYVE1+TFF1+REG1B,
+                        data=strat_data, family = "binomial") 
+summary(modelo_logistico)
+
+```
+
+Con este modelo vemos que TFF1 y REG1B no resultan significativas, elimino 1
+
+```{r}
+modelo_logistico <- glm(diagnosis ~ sexo+edad+LYVE1+REG1B,
+                        data=strat_data, family = "binomial") 
+summary(modelo_logistico)
+
+```
+
+REG1B me sigue dando no significativa. Ahora pruebo con la otra:
+
+```{r}
+modelo_logistico <- glm(diagnosis ~ sexo+edad+LYVE1+TFF1,
+                        data=strat_data, family = "binomial") 
+summary(modelo_logistico)
+
+```
+Ahora me dan todas significativas. Me quedo con este modelo.
+
+
+## 2. Evalúe la calidad de ajuste del modelo con al menos dos criterios distintos.
+
+```{r}
+predicciones <- predict(object = modelo_logistico, newdata = strat_data, type = "response") 
+curva_roc <- pROC::roc(response = strat_data$diagnosis, predictor = predicciones)
+curva_roc
+```
+```{r}
+plot(curva_roc,col="red",lwd=2,main="ROC test")
+```
+
+Vemos que el valor de Área Bajo la Curva ROC es superior a 0,5 y cercano a 1, lo que indica una buena calidad de ajuste  
+
+
+
+
+
+## 3. Interprete los coeficientes del modelo elegido.
+
+```{r}
+coef_sexoM <- modelo_logistico$coefficients["sexoM"]
+coef_edad <- modelo_logistico$coefficients["edad"]
+coef_LYVE1 <- modelo_logistico$coefficients["LYVE1"]
+coef_TFF1 <- modelo_logistico$coefficients["TFF1"]
+coef_sexoM
+coef_edad
+coef_LYVE1
+coef_TFF1
+```
+```{r}
+table(strat_data$diagnosis)
+```
+
+
+Todos los coeficientes son negativos, el modelo logistico predice entre maligno (0) y normal (1). Entendemos que en ese orden, ser de sexo masculino, tener una edad alta y altos valores de TFF1 y LYVE1 incrementan el riesgo de tener diagnóstico maligno.
+

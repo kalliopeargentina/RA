@@ -1,0 +1,77 @@
+---
+title: "Repaso y algo breve sobre muestreo - Clase 7"
+author: "Cecilia Oliva"
+date: "11/07/2023"
+output:
+   html_document:
+     toc: yes
+     code_folding: show
+     toc_float: yes
+     df_print: paged
+     theme: united
+     code_download: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<br>
+<br>
+
+# Muestreo estratificado
+
+<br>
+
+## <span style="color:darkred">Ejemplo: Índice de masa corporal infantil</span>
+
+<br>
+
+Consideramos el siguiente conjunto de datos sobre índice de masa corporal infantil.
+
+<br>
+
+```{r echo=TRUE}
+PACIENTE<-1:30
+EDAD<-c(7, 7, 8, 7, 7, 10,7 ,7, 7 ,9, 9, 11, 7, 9,  9, 11, 12, 7, 11,  6,  8,  8,  7, 10,  7,  8, 10,  7,  9, 10)
+SEXO<-c("M", "M", "M", "F", "M", "M" ,"M", "M", "M", "M", "M", "F", "M" ,"M" ,"F" ,"M", "M" ,"M" ,"M" ,"F" ,"F" ,"F", "F","F", "M" ,"M" ,"F", "F" ,"F" ,"M")  
+PESO<-c(24.4, 23.6, 47.0, 24.0, 23.9, 41.0, 32.9, 22.4, 28.7, 31.4, 28.9, 51.2, 26.2, 58.5, 23.7, 25.5, 49.7, 39.6,42.5, 21.6, 38.0, 26.6, 20.4, 23.7, 21.4, 45.7, 51.3, 28.0, 26.9, 43.9)
+TALLA<-c(1.2, 1.2, 1.4, 1.2, 1.2, 1.4, 1.3, 1.2, 1.3, 1.3, 1.3, 1.6, 1.3, 1.5, 1.3, 1.3, 1.7, 1.3, 1.5, 1.2, 1.3, 1.2, 1.2,1.3, 1.2, 1.4, 1.5, 1.3, 1.3, 1.5)
+IMC<-c(16.94444, 16.38889, 23.97959, 16.66667, 16.59722, 20.91837, 19.46746, 15.55556, 16.98225, 18.57988,17.10059, 20.00000, 15.50296, 26.00000, 14.02367, 15.08876, 17.19723, 23.43195, 18.88889, 15.00000,22.48521, 18.47222, 14.16667, 14.02367, 14.86111, 23.31633, 22.80000, 16.56805, 15.91716, 19.51111)
+PIMC<-c(7.97, 72.72, 97.08, 83.88, 45.85, 87.33, 96.57, 32.88, 80.77, 92.72, 55.54, 77.77, 70.70, 98.69,  3.25,2.07, 38.08, 98.75, 80.60, 39.97, 96.07, 71.06,  3.44,  2.02, 56.86, 98.99, 90.84, 57.50, 44.77, 84.89)
+CC<-c(54, 52, 76, 63, 56, 78, 69, 52, 60, 69, 60, 75, 50, 88, 58, 73, 75, 76, 72, 52, 76, 54, 52, 56, 56, 78, 76, 57, 57, 76)
+CatPeso<-c("N",  "N",  "OB", "N",  "N",  "SO", "OB", "N",  "N",  "SO", "N",  "N",  "N",  "OB", "D",  "D",  "N",  "OB","N" , "N",  "OB", "N",  "D",  "D",  "N",  "OB", "SO", "N",  "N",  "N" )
+IMCin<-data.frame(PACIENTE,EDAD,SEXO,PESO,TALLA,IMC,PIMC,CC,CatPeso)
+
+dim(IMCin)#30  9
+#View(IMCin)
+```
+
+
+Recordamos fijar la semilla siempre que se quieran reutilizarse los datos.
+
+<br>
+
+```{r echo=TRUE}
+table(IMCin$SEXO)
+
+table(IMCin$CatPeso)
+
+library(splitstackshape)
+set.seed(2023)
+strat_sexo<-stratified(IMCin, "SEXO", 0.7)
+
+table(strat_sexo$SEXO)
+
+table(strat_sexo$CatPeso)
+
+set.seed(2023)
+strat_sexo_peso<-stratified(IMCin, c("SEXO","CatPeso"), 0.7)
+table(strat_sexo_peso$SEXO)
+                              
+table(strat_sexo_peso$CatPeso)
+```
+
+<br>
+
+Observamos que se mantienen las proporciones originales de las muestras en las variables que son contempladas en el argumento de la función stratified, en principio las otras no tienen necesariamente una distribución similar.
